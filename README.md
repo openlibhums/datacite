@@ -1,5 +1,5 @@
 # datecitexml
-Allows staff to export a datacite xml file for creating DOIs.
+Allows staff to mint Datacite DOIs.
 
 ## Installation
 - Clone into the `/path/to/janeway/src/plugins` folder

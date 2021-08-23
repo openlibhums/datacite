@@ -1,0 +1,45 @@
+{% extends "admin/core/base.html" %}
+{% load foundation %}
+
+{% block title %}Datacite XML Exporter{% endblock %}
+
+{% block body %}
+<div class="box">
+    <div class="title-area">
+        <h2>Datacite XML Exporter</h2>
+    </div>
+    <div class="content">
+        <p>Select an article to export an XML file for Datacite Metadata. Only articles with a DOI will be presented here.</p>
+        <table class="table" id="datacite_table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Title</th>
+                    <th>Stage</th>
+                    <th>Correspondence Author</th>
+                    <th>DOI</th>
+                    <th>Data</th>
+                    <th>Mint</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for article in articles %}
+                    <tr>
+                        <td>{{ article.pk }}</td>
+                        <td>{{ article.title|safe }}</td>
+                        <td>{{ article.stage }}</td>
+                        <td>{{ article.correspondence_author.full_name }}</td>
+                        <td>{{ article.datacite_doi }}</td>
+                        <td><a href="{% url 'datacitexml_article_export' article.pk %}" target="_blank" class="small button">View Data</a></td>
+                        <td>{% if not article.datacite_doi %}<a href="{% url 'datacitexml_add_doi' article.pk %}" class="small button">Add DOI</a>{% endif %}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock body %}
+
+{% block js %}
+    {% include "elements/datatables.html" with target="#datacite_table" order=2 %}
+{% endblock %}

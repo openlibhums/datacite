@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<resource xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://datacite.org/schema/kernel-4"
+          xsi:schemaLocation="http://datacite.org/schema/kernel-4 http://schema.datacite.org/meta/kernel-4.1/metadata.xsd">
+    <identifier identifierType="DOI">{{ article.get_doi }}</identifier>
+    <creators>
+        {% for author in article.frozenauthor_set.all %}
+            <creator>
+                <creatorName nameType="Personal">{{ author.last_name }}, {{ author.first_name }}</creatorName>
+                <givenName>{{ author.first_name }}</givenName>
+                <familyName>{{ author.last_name }}</familyName>
+                {% if author.author and author.author.orcid %}
+                    <nameIdentifier schemeURI="http://orcid.org/"
+                                    nameIdentifierScheme="ORCID">{{ author.author.orcid }}</nameIdentifier>
+                {% endif %}
+                <affiliation>{{ author.affiliation }}</affiliation>
+            </creator>
+        {% endfor %}
+    </creators>
+    <titles>
+        <title xml:lang="en-US">{{ article.title }}</title>
+        {% if article.subtitle %}<title xml:lang="en-US" titleType="Subtitle">{{ article.subtitle }}</title>{% endif %}
+    </titles>
+    {% if article.journal.publisher  %}
+    <publisher>{{ article.journal.publisher }}</publisher>
+    {% endif %}
+    <publicationYear>{{ article.date_published|date:"Y" }}</publicationYear>
+    <subjects>
+        {% for keyword in article.keywords.all %}
+            <subject xml:lang="en">{{ keyword.word }}</subject>
+        {% endfor %}
+    </subjects>
+    <dates>
+        <date dateType="Available" dateInformation="Published">{{ article.date_published|date:"Y-m-d" }}</date>
+    </dates>
+    <language>en-US</language>
+    <resourceType resourceTypeGeneral="Text">XML</resourceType>
+    {% if article.galley_set.all %}
+    <formats>
+        {% for galley in article.galley_set.all %}
+            <format>{{ galley.file.mime_type }}</format>
+        {% endfor %}
+    </formats>
+    {% endif %}
+    <rightsList>
+        <rights xml:lang="en-US" rightsURI="{{ article.license.url }}">{{ article.license.name }}</rights>
+    </rightsList>
+    <descriptions>
+        <description xml:lang="en-US" descriptionType="Abstract">
+            {{ article.abstract|striptags }}
+        </description>
+        <description descriptionType="SeriesInformation">
+            {{ article.journal.name }}, Volume {{ article.issue.volume }}, Issue {{ article.issue.issue }}, {{ article.issue.date|date:"Y" }}
+        </description>
+    </descriptions>
+</resource>

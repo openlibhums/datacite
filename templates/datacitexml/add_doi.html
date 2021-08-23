@@ -1,0 +1,33 @@
+{% extends "admin/core/base.html" %}
+{% load foundation %}
+
+{% block title %}Add Datacite DOI{% endblock %}
+
+{% block body %}
+    <div class="box">
+        <div class="title-area">
+            <h2>Add Datacite DOI</h2>
+        </div>
+        <div class="content">
+            <div class="row expanded">
+                <div class="large-6 columns">
+                    <form method="POST">
+                        {% csrf_token %}
+                        {{ form|foundation }}
+                        <div class="row">
+                            <div class="large-12 columns">
+                                <button class="button">Save</button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="large-6 columns">
+                    <p>
+                        Add a suffix to the prefix displayed to create a DOI for this article.
+                    </p>
+                </div>
+            </div>
+
+        </div>
+    </div>
+{% endblock body %}

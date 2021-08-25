@@ -69,7 +69,7 @@ def add_doi(request, article_id):
             deposit_successful = utils.mint_datacite_doi(article, doi)
 
             if deposit_successful:
-                form.save(commit=False)
+                form.save()
                 messages.add_message(
                     request,
                     messages.SUCCESS,

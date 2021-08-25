@@ -1,6 +1,6 @@
 from django.conf.urls import url
 
-from plugins.datacitexml import views
+from plugins.datacite import views
 
 
 urlpatterns = [

@@ -6,7 +6,7 @@ from django.http import JsonResponse
 
 from submission import models
 from identifiers import models as ident_models
-from plugins.datacitexml import plugin_settings, forms, utils
+from plugins.datacite import plugin_settings, forms, utils
 
 
 @staff_member_required
@@ -21,7 +21,7 @@ def article_list(request):
             id_type='doi',
         ).first()
 
-    template = 'datacitexml/article_list.html'
+    template = 'datacite/article_list.html'
     context = {
         'articles': articles,
     }
@@ -86,7 +86,7 @@ def add_doi(request, article_id):
                     messages.ERROR,
                     'DOI was not minted.',
                 )
-    template = 'datacitexml/add_doi.html'
+    template = 'datacite/add_doi.html'
     context = {
         'article': article,
         'prefix': plugin_settings.DATACITE_PREFIX,

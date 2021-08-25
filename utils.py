@@ -1,7 +1,7 @@
 import requests
 from requests.auth import HTTPBasicAuth
 
-from plugins.datacitexml import plugin_settings
+from plugins.datacite import plugin_settings
 
 
 def prep_data(article, doi):

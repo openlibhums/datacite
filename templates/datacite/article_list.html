@@ -30,8 +30,8 @@
                         <td>{{ article.stage }}</td>
                         <td>{{ article.correspondence_author.full_name }}</td>
                         <td>{{ article.datacite_doi }}</td>
-                        <td><a href="{% url 'datacitexml_article_export' article.pk %}" target="_blank" class="small button">View Data</a></td>
-                        <td>{% if not article.datacite_doi %}<a href="{% url 'datacitexml_add_doi' article.pk %}" class="small button">Add DOI</a>{% endif %}</td>
+                        <td><a href="{% url 'datacite_article_export' article.pk %}" target="_blank" class="small button">View Data</a></td>
+                        <td>{% if not article.datacite_doi %}<a href="{% url 'datacite_add_doi' article.pk %}" class="small button">Add DOI</a>{% endif %}</td>
                     </tr>
                 {% endfor %}
             </tbody>

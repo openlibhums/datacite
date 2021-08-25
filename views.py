@@ -50,7 +50,7 @@ def add_doi(request, article_id):
         )
         return redirect(
             reverse(
-                'datacitexml_articles'
+                'datacite_articles'
             )
         )
     form = forms.DOIForm(
@@ -77,7 +77,7 @@ def add_doi(request, article_id):
                 )
                 return redirect(
                     reverse(
-                        'datacitexml_articles',
+                        'datacite_articles',
                     )
                 )
             else:

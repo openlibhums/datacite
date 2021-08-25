@@ -1,6 +1,8 @@
 import requests
 from requests.auth import HTTPBasicAuth
 
+from django.utils.html import strip_tags
+
 from plugins.datacite import plugin_settings
 
 
@@ -54,7 +56,7 @@ def prep_data(article, doi):
                 "descriptions": [
                     {
                         "descriptionType": "Abstract",
-                        "description": article.abstract,
+                        "description": strip_tags(article.abstract),
                     },
                     {
                         "descriptionType": "SeriesInformation",

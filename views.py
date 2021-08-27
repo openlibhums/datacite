@@ -108,6 +108,9 @@ def article_export(request, article_id):
         models.Article,
         pk=article_id,
     )
-    doi = '10.1234/example.doi',
+    if article.get_doi():
+        doi = article.get_doi()
+    else:
+        doi = '10.1234/example.doi',
     article_data = utils.prep_data(article, doi)
     return JsonResponse(article_data)

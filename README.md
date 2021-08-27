@@ -1,4 +1,4 @@
-# datecitexml
+# datecite
 Allows staff to mint Datacite DOIs.
 
 ## Installation

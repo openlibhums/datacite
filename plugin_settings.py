@@ -1,6 +1,8 @@
 from django.conf import settings
 
 from utils import plugins
+from events import logic as events_logic
+from plugins.datacite import utils
 
 PLUGIN_NAME = 'Datacite Plugin'
 DISPLAY_NAME = 'Datacite'
@@ -16,6 +18,7 @@ DATACITE_PASSWORD = ''
 DATACITE_PREFIX = ''
 DATACITE_API_URL = 'https://api.datacite.org/dois'
 JOURNAL_PREFIX = True
+MINT_AUTOMATICALLY = False
 
 if settings.DEBUG:
     DATACITE_API_URL = 'https://api.test.datacite.org/dois'  # Use test in debug mode.
@@ -42,4 +45,11 @@ def hook_registry():
 
 
 def register_for_events():
-    pass
+    events_logic.Events.register_for_event(
+        events_logic.Events.ON_ARTICLE_ACCEPTED,
+        utils.register_doi_automatically,
+    )
+    events_logic.Events.register_for_event(
+        events_logic.Events.ON_ARTICLE_PUBLISHED,
+        utils.publish_doi_automatically,
+    )

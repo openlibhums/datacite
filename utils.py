@@ -2,11 +2,13 @@ import requests
 from requests.auth import HTTPBasicAuth
 
 from django.utils.html import strip_tags
+from django.utils import timezone
 
 from plugins.datacite import plugin_settings
+from identifiers import models as ident_models
 
 
-def prep_data(article, doi):
+def prep_data(article, doi, event):
     series_information = article.journal.name
 
     if article.issue:
@@ -27,12 +29,14 @@ def prep_data(article, doi):
     if article.xml_galleys:
         formats.append("XML")
 
+    publicationYear = article.date_published.year if article.date_published else timezone.now().year
+
     article_data = {
         "data": {
             "id": doi,
             "type": "dois",
             "attributes": {
-                "event": "publish",
+                "event": event,
                 "doi": doi,
                 "creators": [{
                     'name': author.full_name(),
@@ -49,7 +53,7 @@ def prep_data(article, doi):
                     "title": article.title,
                 }],
                 "publisher": article.journal.publisher,
-                "publicationYear": article.date_published.year,
+                "publicationYear":  publicationYear,
                 "types": {
                     "resourceTypeGeneral": "JournalArticle",
                 },
@@ -77,7 +81,7 @@ def prep_data(article, doi):
                 "dates": [
                     {
                         "dateType": "Available",
-                        "date": str(article.date_published.date()),
+                        "date": str(article.date_published.date()) if article.date_published else '',
                     }
                 ],
             }
@@ -97,15 +101,66 @@ def prep_data(article, doi):
     return article_data
 
 
-def mint_datacite_doi(article, doi):
+def mint_datacite_doi(article, doi, event='publish'):
     headers = {"Content-Type": "application/vnd.api+json"}
-    response = requests.post(
-        url=plugin_settings.DATACITE_API_URL,
-        json=prep_data(article, doi),
-        headers=headers,
-        auth=HTTPBasicAuth(plugin_settings.DATACITE_USERNAME, plugin_settings.DATACITE_PASSWORD)
-    )
+
+    print(article, article.get_doi(), event)
+
+    if plugin_settings.MINT_AUTOMATICALLY and event == 'publish' and article.get_doi():
+        # The DOI will exists and we should use a PUT command
+        url = '{}/{}'.format(plugin_settings.DATACITE_API_URL, article.get_doi())
+        response = requests.put(
+            url=url,
+            json=prep_data(article, doi, event),
+            headers=headers,
+            auth=HTTPBasicAuth(plugin_settings.DATACITE_USERNAME, plugin_settings.DATACITE_PASSWORD)
+        )
+    else:
+        response = requests.post(
+            url=plugin_settings.DATACITE_API_URL,
+            json=prep_data(article, doi, event),
+            headers=headers,
+            auth=HTTPBasicAuth(plugin_settings.DATACITE_USERNAME, plugin_settings.DATACITE_PASSWORD)
+        )
     if response.status_code == 201:
         return True
     else:
+        print(response.content)
         return False
+
+
+def register_doi_automatically(**kwargs):
+    """
+    Function called thru events framework.
+    """
+    article = kwargs.get('article')
+    doi = "{prefix}/{journal_code}.{article_id}".format(
+        prefix=plugin_settings.DATACITE_PREFIX,
+        journal_code=article.journal.code if plugin_settings.JOURNAL_PREFIX else '',
+        article_id=article.pk
+    )
+    success = mint_datacite_doi(article, doi, event='register')
+
+    if success:
+        ident_models.Identifier.objects.get_or_create(
+            id_type='doi',
+            identifier=doi,
+            article=article,
+        )
+
+
+def publish_doi_automatically(**kwargs):
+    article = kwargs.get('article')
+    doi = "{prefix}/{journal_code}.{article_id}".format(
+        prefix=plugin_settings.DATACITE_PREFIX,
+        journal_code=article.journal.code if plugin_settings.JOURNAL_PREFIX else '',
+        article_id=article.pk
+    )
+    success = mint_datacite_doi(article, doi, event='publish')
+
+    if success:
+        ident_models.Identifier.objects.get_or_create(
+            id_type='doi',
+            identifier=doi,
+            article=article,
+        )

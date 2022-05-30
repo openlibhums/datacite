@@ -15,6 +15,7 @@ DATACITE_USERNAME = ''
 DATACITE_PASSWORD = ''
 DATACITE_PREFIX = ''
 DATACITE_API_URL = 'https://api.datacite.org/dois'
+JOURNAL_PREFIX = True
 
 if settings.DEBUG:
     DATACITE_API_URL = 'https://api.test.datacite.org/dois'  # Use test in debug mode.

@@ -56,7 +56,10 @@ def add_doi(request, article_id):
     form = forms.DOIForm(
         article=article,
         initial={
-            'identifier': "{prefix}/".format(prefix=plugin_settings.DATACITE_PREFIX),
+            'identifier': "{prefix}/{journal_code}.".format(
+                prefix=plugin_settings.DATACITE_PREFIX,
+                journal_code=request.journal.code if plugin_settings.JOURNAL_PREFIX else '',
+            ),
         }
     )
     if request.POST:

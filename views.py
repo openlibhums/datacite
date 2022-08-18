@@ -115,5 +115,5 @@ def article_export(request, article_id):
         doi = article.get_doi()
     else:
         doi = '10.1234/example.doi',
-    article_data = utils.prep_data(article, doi)
+    article_data = utils.prep_data(article, doi, '')
     return JsonResponse(article_data)

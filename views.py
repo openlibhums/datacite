@@ -69,7 +69,7 @@ def add_doi(request, article_id):
         )
         if form.is_valid():
             doi = form.cleaned_data.get('identifier')
-            deposit_successful = utils.mint_datacite_doi(article, doi)
+            deposit_successful, text = utils.mint_datacite_doi(article, doi)
 
             if deposit_successful:
                 form.save()
@@ -87,7 +87,7 @@ def add_doi(request, article_id):
                 messages.add_message(
                     request,
                     messages.ERROR,
-                    'DOI was not minted.',
+                    'DOI was not minted.<br />{}'.format(text),
                 )
     template = 'datacite/add_doi.html'
     context = {

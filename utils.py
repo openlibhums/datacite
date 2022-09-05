@@ -104,8 +104,6 @@ def prep_data(article, doi, event):
 def mint_datacite_doi(article, doi, event='publish'):
     headers = {"Content-Type": "application/vnd.api+json"}
 
-    print(article, article.get_doi(), event)
-
     if plugin_settings.MINT_AUTOMATICALLY and event == 'publish' and article.get_doi():
         # The DOI will exists and we should use a PUT command
         url = '{}/{}'.format(plugin_settings.DATACITE_API_URL, article.get_doi())
@@ -123,10 +121,9 @@ def mint_datacite_doi(article, doi, event='publish'):
             auth=HTTPBasicAuth(plugin_settings.DATACITE_USERNAME, plugin_settings.DATACITE_PASSWORD)
         )
     if response.status_code == 201:
-        return True
+        return True, 'Okay'
     else:
-        print(response.content)
-        return False
+        return False, response.content
 
 
 def register_doi_automatically(**kwargs):
@@ -139,7 +136,7 @@ def register_doi_automatically(**kwargs):
         journal_code=article.journal.code if plugin_settings.JOURNAL_PREFIX else '',
         article_id=article.pk
     )
-    success = mint_datacite_doi(article, doi, event='register')
+    success, text = mint_datacite_doi(article, doi, event='register')
 
     if success:
         ident_models.Identifier.objects.get_or_create(
@@ -156,7 +153,7 @@ def publish_doi_automatically(**kwargs):
         journal_code=article.journal.code if plugin_settings.JOURNAL_PREFIX else '',
         article_id=article.pk
     )
-    success = mint_datacite_doi(article, doi, event='publish')
+    success, text = mint_datacite_doi(article, doi, event='publish')
 
     if success:
         ident_models.Identifier.objects.get_or_create(

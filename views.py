@@ -21,9 +21,38 @@ def article_list(request):
             id_type='doi',
         ).first()
 
+    if request.POST:
+        article_id = request.POST.get('article_id')
+        article = articles.get(pk=article_id)
+        article.datacite_doi = ident_models.Identifier.objects.filter(
+            article=article,
+            id_type='doi',
+        ).first()
+
+        if article.datacite_doi:
+            deposit_successful, text = utils.mint_datacite_doi(article, article.datacite_doi.identifier)
+            if deposit_successful:
+                messages.add_message(
+                    request,
+                    messages.SUCCESS,
+                    'DOI Added.',
+                )
+                return redirect(
+                    reverse(
+                        'datacite_articles',
+                    )
+                )
+            else:
+                messages.add_message(
+                    request,
+                    messages.ERROR,
+                    'DOI was not minted.<br />{}'.format(text),
+                )
+
     template = 'datacite/article_list.html'
     context = {
         'articles': articles,
+        'redeposit_button': plugin_settings.REDEPOSIT_BUTTON,
     }
 
     return render(request, template, context)
@@ -46,7 +75,7 @@ def add_doi(request, article_id):
         messages.add_message(
             request,
             messages.WARNING,
-            'Article already has a DOI',
+            'Article {} already has a DOI'.format(article.pk),
         )
         return redirect(
             reverse(

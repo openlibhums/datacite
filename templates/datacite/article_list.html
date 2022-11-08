@@ -20,6 +20,7 @@
                     <th>DOI</th>
                     <th>Data</th>
                     <th>Mint</th>
+                    {% if redeposit_button %}<th>Re-deposit</th>{% endif %}
                 </tr>
             </thead>
             <tbody>
@@ -32,6 +33,15 @@
                         <td>{{ article.datacite_doi }}</td>
                         <td><a href="{% url 'datacite_article_export' article.pk %}" target="_blank" class="small button">View Data</a></td>
                         <td>{% if not article.datacite_doi %}<a href="{% url 'datacite_add_doi' article.pk %}" class="small button">Add DOI</a>{% endif %}</td>
+                        {% if redeposit_button %}<td>
+                            {% if article.datacite_doi %}
+                            <form method="POST">
+                                {% csrf_token %}
+                                <button class="small button" name="article_id" value="{{ article.pk }}">Re-deposit</button>
+                            </form>
+                            {% endif %}
+                        </td>
+                        {% endif %}
                     </tr>
                 {% endfor %}
             </tbody>

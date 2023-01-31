@@ -20,6 +20,7 @@ DATACITE_API_URL = 'https://api.datacite.org/dois'
 JOURNAL_PREFIX = True
 MINT_AUTOMATICALLY = False
 REDEPOSIT_BUTTON = False
+JOURNAL_CODES_TO_EXCLUDE = []
 
 if settings.DEBUG:
     DATACITE_API_URL = 'https://api.test.datacite.org/dois'  # Use test in debug mode.

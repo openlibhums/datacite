@@ -1,6 +1,5 @@
-from django.shortcuts import render, get_object_or_404, HttpResponse, redirect, reverse
+from django.shortcuts import render, get_object_or_404, redirect, reverse
 from django.contrib.admin.views.decorators import staff_member_required
-from django.template.loader import render_to_string
 from django.contrib import messages
 from django.http import JsonResponse
 

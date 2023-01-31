@@ -3,6 +3,7 @@ from requests.auth import HTTPBasicAuth
 
 from django.utils.html import strip_tags
 from django.utils import timezone
+from django.contrib import messages
 
 from plugins.datacite import plugin_settings
 from identifiers import models as ident_models
@@ -131,33 +132,49 @@ def register_doi_automatically(**kwargs):
     Function called thru events framework.
     """
     article = kwargs.get('article')
-    doi = "{prefix}/{journal_code}.{article_id}".format(
-        prefix=plugin_settings.DATACITE_PREFIX,
-        journal_code=article.journal.code if plugin_settings.JOURNAL_PREFIX else '',
-        article_id=article.pk
-    )
-    success, text = mint_datacite_doi(article, doi, event='register')
+    if article and article.journal.code not in plugin_settings.JOURNAL_CODES_TO_EXCLUDE:
+        doi = "{prefix}/{journal_code}.{article_id}".format(
+            prefix=plugin_settings.DATACITE_PREFIX,
+            journal_code=article.journal.code if plugin_settings.JOURNAL_PREFIX else '',
+            article_id=article.pk
+        )
+        success, text = mint_datacite_doi(article, doi, event='register')
 
-    if success:
-        ident_models.Identifier.objects.get_or_create(
-            id_type='doi',
-            identifier=doi,
-            article=article,
+        if success:
+            ident_models.Identifier.objects.get_or_create(
+                id_type='doi',
+                identifier=doi,
+                article=article,
+            )
+    else:
+        request = kwargs.get('request')
+        messages.add_message(
+            request,
+            messages.WARNING,
+            'Datacite deposit is disabled for this journal.',
         )
 
 
 def publish_doi_automatically(**kwargs):
     article = kwargs.get('article')
-    doi = "{prefix}/{journal_code}.{article_id}".format(
-        prefix=plugin_settings.DATACITE_PREFIX,
-        journal_code=article.journal.code if plugin_settings.JOURNAL_PREFIX else '',
-        article_id=article.pk
-    )
-    success, text = mint_datacite_doi(article, doi, event='publish')
+    if article and article.journal.code not in plugin_settings.JOURNAL_CODES_TO_EXCLUDE:
+        doi = "{prefix}/{journal_code}.{article_id}".format(
+            prefix=plugin_settings.DATACITE_PREFIX,
+            journal_code=article.journal.code if plugin_settings.JOURNAL_PREFIX else '',
+            article_id=article.pk
+        )
+        success, text = mint_datacite_doi(article, doi, event='publish')
 
-    if success:
-        ident_models.Identifier.objects.get_or_create(
-            id_type='doi',
-            identifier=doi,
-            article=article,
+        if success:
+            ident_models.Identifier.objects.get_or_create(
+                id_type='doi',
+                identifier=doi,
+                article=article,
+            )
+    else:
+        request = kwargs.get('request')
+        messages.add_message(
+            request,
+            messages.WARNING,
+            'Datacite deposit is disabled for this journal.',
         )

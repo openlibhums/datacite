@@ -30,11 +30,14 @@ class Command(BaseCommand):
             headers = {"Content-Type": "application/vnd.api+json"}
             data = {
                 "data": {
-                    "id": "10.7282/t3-7zhk-y459",
+                    "id": doi.identifier,
                     "type": "dois",
                     "attributes": {
                         "url": doi.article.url,
-                    }
+                        "landingPage": {
+                            "url": doi.article.url,
+                        }
+                    },
                 }
             }
             if options.get('dry_run'):

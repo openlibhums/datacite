@@ -1,6 +1,7 @@
 import time
 import requests
 from requests.auth import HTTPBasicAuth
+from pprint import pprint
 
 from django.core.management.base import BaseCommand
 
@@ -12,6 +13,9 @@ class Command(BaseCommand):
     """Updates all datacite DOIs in a batch."""
 
     help = "Updates all datacite DOIs in a batch. "
+
+    def add_arguments(self, parser):
+        parser.add_argument('--dry_run', action="store_true", default=False)
 
     def handle(self, *args, **options):
         dois = models.Identifier.objects.filter(
@@ -29,15 +33,19 @@ class Command(BaseCommand):
                     "id": "10.7282/t3-7zhk-y459",
                     "type": "dois",
                     "attributes": {
-                        "url": "https://example.org"
+                        "url": doi.article.url,
                     }
                 }
             }
-            response = requests.put(
-                url=url,
-                json=data,
-                headers=headers,
-                auth=HTTPBasicAuth(plugin_settings.DATACITE_USERNAME,
-                                   plugin_settings.DATACITE_PASSWORD)
-            )
+            if options.get('dry_run'):
+                pprint(data)
+            else:
+                response = requests.put(
+                    url=url,
+                    json=data,
+                    headers=headers,
+                    auth=HTTPBasicAuth(plugin_settings.DATACITE_USERNAME,
+                                       plugin_settings.DATACITE_PASSWORD)
+                )
+                print(response)
             time.sleep(2)

@@ -22,7 +22,8 @@ class Command(BaseCommand):
             id_type='doi',
         )
 
-        for doi in dois:
+        for i, doi in enumerate(dois):
+            print(f"Updating {i}/{len(dois)}")
             url = '{}/{}'.format(
                 plugin_settings.DATACITE_API_URL,
                 doi.identifier,
@@ -50,5 +51,6 @@ class Command(BaseCommand):
                     auth=HTTPBasicAuth(plugin_settings.DATACITE_USERNAME,
                                        plugin_settings.DATACITE_PASSWORD)
                 )
-                print(response)
+                if response.status_code == 200:
+                    print('URL updated to ', response.json()['data']['attributes']['url'])
             time.sleep(2)

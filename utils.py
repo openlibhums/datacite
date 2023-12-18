@@ -122,7 +122,7 @@ def mint_datacite_doi(article, doi, event=None):
             headers=headers,
             auth=HTTPBasicAuth(plugin_settings.DATACITE_USERNAME, plugin_settings.DATACITE_PASSWORD)
         )
-    if response.status_code == 201:
+    if response.status_code in [200, 201]:
         return True, 'Okay'
     else:
         return False, response.content

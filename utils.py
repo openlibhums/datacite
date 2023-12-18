@@ -76,7 +76,6 @@ def prep_data(article, doi, event=None):
                 "formats": formats,
                 "url": article.url,
                 "schemaVersion": "http://datacite.org/schema/kernel-4.4",
-                "language": article.language,
                 "dates": [
                     {
                         "dateType": "Available",

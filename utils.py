@@ -8,7 +8,7 @@ from plugins.datacite import plugin_settings
 from identifiers import models as ident_models
 
 
-def prep_data(article, doi, event):
+def prep_data(article, doi, event=None):
     series_information = article.journal.name
 
     if article.issue:
@@ -36,7 +36,6 @@ def prep_data(article, doi, event):
             "id": doi,
             "type": "dois",
             "attributes": {
-                "event": event,
                 "doi": doi,
                 "creators": [{
                     'name': author.full_name(),
@@ -98,10 +97,13 @@ def prep_data(article, doi, event):
             }
         ]
 
+    if event:
+        article_data["data"]["attributes"]["event"] = event
+
     return article_data
 
 
-def mint_datacite_doi(article, doi, event='publish'):
+def mint_datacite_doi(article, doi, event=None):
     headers = {"Content-Type": "application/vnd.api+json"}
 
     if plugin_settings.MINT_AUTOMATICALLY and event == 'publish' and article.get_doi():
@@ -116,7 +118,7 @@ def mint_datacite_doi(article, doi, event='publish'):
     else:
         response = requests.post(
             url=plugin_settings.DATACITE_API_URL,
-            json=prep_data(article, doi, event),
+            json=prep_data(article, doi),
             headers=headers,
             auth=HTTPBasicAuth(plugin_settings.DATACITE_USERNAME, plugin_settings.DATACITE_PASSWORD)
         )

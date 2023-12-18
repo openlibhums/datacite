@@ -30,7 +30,11 @@ def article_list(request):
         ).first()
 
         if article.datacite_doi:
-            deposit_successful, text = utils.mint_datacite_doi(article, article.datacite_doi.identifier)
+            deposit_successful, text = utils.mint_datacite_doi(
+                article,
+                article.datacite_doi.identifier,
+                'update',
+            )
             if deposit_successful:
                 messages.add_message(
                     request,

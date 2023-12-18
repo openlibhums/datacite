@@ -16,6 +16,7 @@ class Command(BaseCommand):
         parser.add_argument('--dry_run', action="store_true", default=False)
 
     def handle(self, *args, **options):
+        counter = 0
         journal_code = options.get('journal_code')
         dry_run = options.get('dry_run')
         journal = jm.Journal.objects.get(code=journal_code)
@@ -25,6 +26,7 @@ class Command(BaseCommand):
         )
         for article in articles:
             if not article.get_doi():
+                counter = counter + 1
                 doi_from_pattern = "{prefix}/{journal_code}.{article_id}".format(
                     prefix=plugin_settings.DATACITE_PREFIX,
                     journal_code=article.journal.code if plugin_settings.JOURNAL_PREFIX else '',
@@ -44,5 +46,9 @@ class Command(BaseCommand):
                         article=article,
                     )
                     print(f"[{success}] {text}")
+
+        if dry_run:
+            print(f"Found {counter} articles without DOIs.")
+
 
 

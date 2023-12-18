@@ -106,7 +106,7 @@ def prep_data(article, doi, event=None):
 def mint_datacite_doi(article, doi, event=None):
     headers = {"Content-Type": "application/vnd.api+json"}
 
-    if plugin_settings.MINT_AUTOMATICALLY and event == 'publish' and article.get_doi():
+    if event == 'publish' and article.get_doi():
         # The DOI will exists and we should use a PUT command
         url = '{}/{}'.format(plugin_settings.DATACITE_API_URL, article.get_doi())
         response = requests.put(

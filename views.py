@@ -33,7 +33,7 @@ def article_list(request):
             deposit_successful, text = utils.mint_datacite_doi(
                 article,
                 article.datacite_doi.identifier,
-                'update',
+                'publish',
             )
             if deposit_successful:
                 messages.add_message(

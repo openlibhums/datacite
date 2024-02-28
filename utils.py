@@ -16,7 +16,6 @@ def prep_data(article, doi, event=None):
             article.journal.name,
             article.issue.volume,
             article.issue.issue,
-            article.issue.date.year,
         )
         if article.page_range:
             series_information = "{}, {}".format(

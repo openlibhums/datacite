@@ -29,9 +29,9 @@ def prep_data(article, doi, event=None):
 
     formats = []
     if article.pdfs:
-        formats.append("PDF")
+        formats.append("application/pdf")
     if article.xml_galleys:
-        formats.append("XML")
+        formats.append("application/xml")
 
     publicationYear = article.date_published.year if article.date_published else timezone.now().year
 

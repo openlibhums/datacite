@@ -14,7 +14,6 @@ from utils import setting_handler
 @staff_member_required
 def article_list(request):
     articles = submission_models.Article.objects.filter(
-        stage=submission_models.STAGE_PUBLISHED,
         journal=request.journal,
     )
     for article in articles:

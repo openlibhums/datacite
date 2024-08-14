@@ -1,0 +1,42 @@
+{% extends "admin/core/base.html" %}
+{% load foundation bool_fa %}
+
+{% block page_title %}Datacite Plugin Sections{% endblock page_title %}
+{% block title %}Datacite Plugin Sections{% endblock %}
+
+{% block breadcrumbs %}
+    {{ block.super }}
+    {% include "datacite/breadcrumb.html" %}
+    <li>Section Mint Control</li>
+{% endblock %}
+
+
+{% block body %}
+    <div class="box">
+        <div class="title-area">
+          <h2>Manage Section Minting</h2>
+        </div>
+        <div class="content">
+            <div class="row expanded">
+                <div class="large-12 columns">
+                    <p>This page allows you to set for which sections (article types) Janeway will mint Datacite DOIs for.</p>
+
+                    <div class="callout bs-callout bs-callout-warning">
+                      <p>
+                        <span class="fa fa-exclamation-triangle"> </span>
+                        This controller will only operate if the auto deposit
+                        setting is enabled for the whole journal. Auto deposit
+                        is currently {{ auto_mint_is_enabled|bool_fa }} {% if auto_mint_is_enabled %} enabled {% else %} disabled{% endif %}.
+                      </p>
+                    </div>
+
+                    <form method="POST">
+                        {% csrf_token %}
+                        {{ form|foundation }}
+                        <button class="button success" type="submit">Save</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock body %}

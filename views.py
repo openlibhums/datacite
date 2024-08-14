@@ -1,18 +1,19 @@
-from django.shortcuts import render, get_object_or_404, HttpResponse, redirect, reverse
+from django.shortcuts import render, get_object_or_404, redirect, reverse
 from django.contrib.admin.views.decorators import staff_member_required
-from django.template.loader import render_to_string
 from django.contrib import messages
 from django.http import JsonResponse
 
-from submission import models
+from submission import models as submission_models
 from identifiers import models as ident_models
-from plugins.datacite import plugin_settings, forms, utils
+from plugins.datacite import plugin_settings, forms, utils, models
+from core import forms as core_forms
+from security.decorators import has_journal
+from utils import setting_handler
 
 
 @staff_member_required
 def article_list(request):
-    articles = models.Article.objects.filter(
-        stage=models.STAGE_PUBLISHED,
+    articles = submission_models.Article.objects.filter(
         journal=request.journal,
     )
     for article in articles:
@@ -68,7 +69,7 @@ def add_doi(request, article_id):
     Allows an editor to add a DOI to an article and mint it.
     """
     article = get_object_or_404(
-        models.Article,
+        submission_models.Article,
         pk=article_id,
     )
     datacite_doi = ident_models.Identifier.objects.filter(
@@ -145,7 +146,7 @@ def article_export(request, article_id):
     Generates and serves a Datacite JSON.
     """
     article = get_object_or_404(
-        models.Article,
+        submission_models.Article,
         pk=article_id,
     )
     if article.get_doi():
@@ -154,3 +155,83 @@ def article_export(request, article_id):
         doi = '10.1234/example.doi',
     article_data = utils.prep_data(article, doi, '')
     return JsonResponse(article_data)
+
+
+@has_journal
+@staff_member_required
+def manager(request):
+    """
+    Presents a management form for plugin settings.
+    """
+    settings = utils.get_settings(request.journal)
+    manager_form = core_forms.GeneratedSettingForm(
+        settings=settings
+    )
+    if request.POST:
+        manager_form = core_forms.GeneratedSettingForm(
+            request.POST,
+            settings=settings,
+        )
+        if manager_form.is_valid():
+            manager_form.save(
+                group='plugin:datacite',
+                journal=request.journal,
+            )
+            messages.add_message(
+                request,
+                messages.SUCCESS,
+                'Form saved.',
+            )
+            return redirect(
+                reverse('datacite_manager')
+            )
+
+    template = 'datacite/manager.html'
+    context = {
+        'manager_form': manager_form,
+    }
+    return render(
+        request,
+        template,
+        context,
+    )
+
+
+@has_journal
+@staff_member_required
+def section_mint_manager(request):
+    try:
+        section_mint = models.SectionMint.objects.get(
+            journal=request.journal
+        )
+    except models.SectionMint.DoesNotExist:
+        section_mint = None
+
+    form = forms.SectionMintForm(
+        instance=section_mint,
+        request_journal=request.journal,
+    )
+    if request.method == 'POST':
+        form = forms.SectionMintForm(
+            request.POST,
+            instance=section_mint,
+            request_journal=request.journal,
+        )
+        if form.is_valid():
+            form.save()
+            return redirect('datacite_section_mint_manager')
+
+    template = 'datacite/section_mint_form.html'
+    context = {
+        'form': form,
+        'auto_mint_is_enabled': setting_handler.get_setting(
+            setting_group_name='plugin:datacite',
+            setting_name='enable_datacite_auto',
+            journal=request.journal,
+        ).processed_value
+    }
+    return render(
+        request,
+        template,
+        context,
+    )

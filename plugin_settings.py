@@ -3,6 +3,7 @@ from django.conf import settings
 from utils import plugins
 from events import logic as events_logic
 from plugins.datacite import utils
+from utils.install import update_settings
 
 PLUGIN_NAME = 'Datacite Plugin'
 DISPLAY_NAME = 'Datacite'
@@ -39,6 +40,9 @@ class DatacitePlugin(plugins.Plugin):
 
 def install():
     DatacitePlugin.install()
+    update_settings(
+        file_path='plugins/datacite/install/settings.json'
+    )
 
 
 def hook_registry():

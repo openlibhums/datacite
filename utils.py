@@ -209,7 +209,7 @@ def auto_deposit_enabled(journal, section=None):
         if section and hasattr(journal, 'sectionmint'):
             # If a section is provided, check if minting is enabled for the
             # section
-            return section in journal.section_mint.sections.all()
+            return section in journal.sectionmint.sections.all()
 
         # If no SectionMint is found or no section is provided, return True
         return True

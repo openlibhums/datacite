@@ -18,6 +18,7 @@ urlpatterns = [
             name='datacite_add_doi'),
     re_path(r'^sections/$', views.section_mint_manager,
             name='datacite_section_mint_manager'),
+    re_path(
         r'^articles/$',
         views.article_list,
         name='datacite_articles',

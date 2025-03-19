@@ -1,0 +1,29 @@
+{% extends "admin/core/base.html" %}
+
+{% block page_title %}Datacite Plugin{% endblock page_title %}
+{% block title %}Datacite Plugin{% endblock %}
+
+{% block breadcrumbs %}
+    {{ block.super }}
+    <li>Datacite Plugin</li>
+{% endblock %}
+
+
+{% block body %}
+    <div class="box">
+        <div class="title-area">
+          <h2>Datacite Plugin Options</h2>
+        </div>
+        <div class="content">
+            <div class="row expanded">
+                <div class="large-4 medium-6 small-12 columns">
+                    <div class="button-group stacked">
+                        <a class="button" href="{% url 'datacite_manager' %}">Settings</a>
+                        <a class="button" href="{% url 'datacite_articles' %}">Article List</a>
+                        <a class="button" href="{% url 'datacite_section_mint_manager' %}">Section Controls</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock body %}

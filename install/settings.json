@@ -1,0 +1,17 @@
+[
+  {
+    "group": {
+      "name": "plugin:datacite"
+    },
+    "setting": {
+      "description": "Enables auto deposit to datacite for this journal.",
+      "is_translatable": false,
+      "name": "enable_datacite_auto",
+      "pretty_name": "Enable Datacite Auto Deposit (PLUGIN)",
+      "type": "boolean"
+    },
+    "value": {
+      "default": ""
+    }
+  }
+]

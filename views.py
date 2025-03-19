@@ -103,7 +103,11 @@ def add_doi(request, article_id):
         )
         if form.is_valid():
             doi = form.cleaned_data.get('identifier')
-            deposit_successful, text = utils.mint_datacite_doi(article, doi)
+            deposit_successful, text = utils.mint_datacite_doi(
+                article,
+                doi,
+                event='publish'
+            )
 
             if deposit_successful:
                 form.save()

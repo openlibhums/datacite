@@ -13,12 +13,16 @@ def prep_data(article, doi, event=None):
     series_information = article.journal.name
 
     if article.issue:
-        series_information = "{} Volume {} Issue {} {}".format(
+        series_information = "{}, {}({})".format(
             article.journal.name,
             article.issue.volume,
             article.issue.issue,
-            article.issue.date.year,
         )
+        if article.page_range:
+            series_information = "{}, {}".format(
+                series_information,
+                article.page_range,
+            )
 
     keywords = []
     for keyword in article.keywords.all():
@@ -26,9 +30,9 @@ def prep_data(article, doi, event=None):
 
     formats = []
     if article.pdfs:
-        formats.append("PDF")
+        formats.append("application/pdf")
     if article.xml_galleys:
-        formats.append("XML")
+        formats.append("application/xml")
 
     publicationYear = article.date_published.year if article.date_published else timezone.now().year
 
@@ -83,6 +87,20 @@ def prep_data(article, doi, event=None):
                         "date": str(article.date_published.date()) if article.date_published else '',
                     }
                 ],
+                "relatedItems": [
+                    {
+                        "relationType": "IsPublishedIn",
+                        "issue": f"{article.issue.issue}",
+                        "volume": f"{article.issue.volume}",
+                        "titles": f"{article.journal.name}",
+                        "publisher": f"{article.journal.publisher}",
+                        "publicationYear": f"{article.date_published.year}",
+                        "relatedItemType": "Journal",
+                        "firstPage": f"{article.first_page if article.first_page else ''}",
+                        "lastPage": f"{article.last_page if article.last_page else ''}",
+
+                    }
+                ]
             }
         }
     }
@@ -96,6 +114,10 @@ def prep_data(article, doi, event=None):
                 "resourceTypeGeneral": "Journal"
             }
         ]
+        article_data["data"]["attributes"]["relatedItems"][0]["relatedItemIdentifier"] = {
+            "relatedItemIdentifier": f"{article.journal.issn}",
+            "relatedItemIdentifierType": "ISSN"
+        }
 
     if event:
         article_data["data"]["attributes"]["event"] = event
@@ -122,6 +144,7 @@ def mint_datacite_doi(article, doi, event=None):
             headers=headers,
             auth=HTTPBasicAuth(plugin_settings.DATACITE_USERNAME, plugin_settings.DATACITE_PASSWORD)
         )
+
     if response.status_code in [200, 201]:
         return True, 'Okay'
     else:

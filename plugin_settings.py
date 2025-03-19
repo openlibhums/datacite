@@ -9,10 +9,10 @@ PLUGIN_NAME = 'Datacite Plugin'
 DISPLAY_NAME = 'Datacite'
 DESCRIPTION = 'Datacite DOI Deposit TOol.'
 AUTHOR = 'Andy Byers'
-VERSION = '0.1'
+VERSION = '0.2'
 SHORT_NAME = 'datacite'
 MANAGER_URL = 'datacite_articles'
-JANEWAY_VERSION = "1.3.8"
+JANEWAY_VERSION = "1.7.0"
 
 DATACITE_USERNAME = ''
 DATACITE_PASSWORD = ''

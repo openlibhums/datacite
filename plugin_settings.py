@@ -18,10 +18,11 @@ DATACITE_USERNAME = ''
 DATACITE_PASSWORD = ''
 DATACITE_PREFIX = ''
 DATACITE_API_URL = 'https://api.datacite.org/dois'
+DATACITE_API_TEST_URL = 'https://api.test.datacite.org/dois'
 JOURNAL_PREFIX = True
 
 if settings.DEBUG:
-    DATACITE_API_URL = 'https://api.test.datacite.org/dois'  # Use test in debug mode.
+    DATACITE_API_URL = DATACITE_API_TEST_URL  # Use test in debug mode.
 
 
 class DatacitePlugin(plugins.Plugin):

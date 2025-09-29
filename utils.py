@@ -7,6 +7,7 @@ from django.utils import timezone
 from plugins.datacite import plugin_settings
 from identifiers import models as ident_models
 from utils import setting_handler
+from journal.models import Journal
 
 
 def prep_data(
@@ -175,10 +176,12 @@ def mint_datacite_doi(
     data = prep_data(article, doi, event)
 
     if event == 'publish' and article.get_doi():
-        url = '{}/{}'.format(
-            plugin_settings.DATACITE_API_URL,
-            article.get_doi(),
-        )
+        # The DOI will exists and we should use a PUT command
+        api_url = plugin_settings.DATACITE_API_URL
+        if hasattr(article.journal, "status"):
+            if article.journal.status == Journal.PublishingStatus.TEST:
+                api_url = plugin_settings.DATACITE_API_TEST_URL
+        url = '{}/{}'.format(api_url, article.get_doi())
         response = requests.put(
             url=url,
             json=data,

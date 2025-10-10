@@ -13,9 +13,23 @@ from utils import setting_handler
 
 @staff_member_required
 def article_list(request):
+    # This filter is a pain but ensures that articles have at least been accepted
+    # and have not subsequently been moved back a stage.
     articles = submission_models.Article.objects.filter(
         journal=request.journal,
+        date_declined__isnull=True,
+        date_accepted__isnull=False,
+    ).exclude(
+        stage__in=[
+            submission_models.STAGE_ARCHIVED,
+            submission_models.STAGE_UNSUBMITTED,
+            submission_models.STAGE_UNASSIGNED,
+            submission_models.STAGE_UNDER_REVIEW,
+            submission_models.STAGE_UNDER_REVISION,
+            submission_models.STAGE_REJECTED
+        ]
     )
+
     for article in articles:
         article.datacite_doi = ident_models.Identifier.objects.filter(
             article=article,
@@ -57,7 +71,6 @@ def article_list(request):
     template = 'datacite/article_list.html'
     context = {
         'articles': articles,
-        'redeposit_button': plugin_settings.REDEPOSIT_BUTTON,
     }
 
     return render(request, template, context)
@@ -103,10 +116,11 @@ def add_doi(request, article_id):
         )
         if form.is_valid():
             doi = form.cleaned_data.get('identifier')
+            findable = form.cleaned_data.get('findable')
             deposit_successful, text = utils.mint_datacite_doi(
                 article,
                 doi,
-                event='publish'
+                event='publish' if findable else 'register',
             )
 
             if deposit_successful:

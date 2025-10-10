@@ -6,7 +6,11 @@ from submission import models as sm
 
 
 class DOIForm(forms.ModelForm):
-
+    findable = forms.BooleanField(
+        required=False,
+        initial=True,
+        help_text="Marks the DOI as findable. Uncheck to register a draft DOI."
+    )
     class Meta:
         model = im.Identifier
         fields = ('identifier',)

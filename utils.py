@@ -9,7 +9,11 @@ from identifiers import models as ident_models
 from utils import setting_handler
 
 
-def prep_data(article, doi, event=None):
+def prep_data(
+    article,
+    doi,
+    event=None,
+):
     series_information = article.journal.name
 
     if article.issue:
@@ -23,10 +27,19 @@ def prep_data(article, doi, event=None):
                 series_information,
                 article.page_range,
             )
+    elif article.page_range:
+        series_information = "{}, {}".format(
+            series_information,
+            article.page_range,
+        )
 
     keywords = []
     for keyword in article.keywords.all():
-        keywords.append({'subject': keyword.word})
+        keywords.append(
+            {
+                'subject': keyword.word,
+            }
+        )
 
     formats = []
     if article.pdfs:
@@ -34,7 +47,11 @@ def prep_data(article, doi, event=None):
     if article.xml_galleys:
         formats.append("application/xml")
 
-    publicationYear = article.date_published.year if article.date_published else timezone.now().year
+    publicationYear = (
+        article.date_published.year
+        if article.date_published
+        else timezone.now().year
+    )
 
     article_data = {
         "data": {
@@ -42,40 +59,39 @@ def prep_data(article, doi, event=None):
             "type": "dois",
             "attributes": {
                 "doi": doi,
-                "creators": [{
-                    'name': author.full_name(),
-                    'nameType': 'Personal',
-                    'givenName': author.first_name,
-                    'familyName': author.last_name,
-                    'affiliation': [
-                        {
-                            'name': author.affiliation(),
-                        }
-                    ]
-                } for author in article.frozen_authors()],
-                "titles": [{
-                    "title": article.title,
-                }],
+                "creators": [
+                    {
+                        'name': author.full_name(),
+                        'nameType': 'Personal',
+                        'givenName': author.first_name,
+                        'familyName': author.last_name,
+                        'affiliation': [
+                            {
+                                'name': author.affiliation(),
+                            }
+                        ],
+                    }
+                    for author in article.frozen_authors()
+                ],
+                "titles": [
+                    {
+                        "title": article.title,
+                    }
+                ],
                 "publisher": article.journal.publisher,
-                "publicationYear":  publicationYear,
+                "publicationYear": publicationYear,
                 "types": {
                     "resourceTypeGeneral": "JournalArticle",
                 },
                 "descriptions": [
                     {
                         "descriptionType": "Abstract",
-                        "description": strip_tags(article.abstract),
+                        "description": strip_tags(article.abstract) if article.abstract else '',
                     },
                     {
                         "descriptionType": "SeriesInformation",
                         "description": series_information,
-                    }
-                ],
-                "rightsList": [
-                    {
-                        "rights": article.license.name,
-                        "rightsUri": article.license.url
-                    }
+                    },
                 ],
                 "subjects": keywords,
                 "formats": formats,
@@ -84,26 +100,48 @@ def prep_data(article, doi, event=None):
                 "dates": [
                     {
                         "dateType": "Available",
-                        "date": str(article.date_published.date()) if article.date_published else '',
+                        "date": str(article.date_published.date())
+                        if article.date_published
+                        else '',
                     }
                 ],
-                "relatedItems": [
-                    {
-                        "relationType": "IsPublishedIn",
-                        "issue": f"{article.issue.issue}",
-                        "volume": f"{article.issue.volume}",
-                        "titles": f"{article.journal.name}",
-                        "publisher": f"{article.journal.publisher}",
-                        "publicationYear": f"{article.date_published.year}",
-                        "relatedItemType": "Journal",
-                        "firstPage": f"{article.first_page if article.first_page else ''}",
-                        "lastPage": f"{article.last_page if article.last_page else ''}",
-
-                    }
-                ]
-            }
+            },
         }
     }
+
+    related_item = {
+        "relationType": "IsPublishedIn",
+        "titles": f"{article.journal.name}",
+        "publisher": f"{article.journal.publisher}",
+        "publicationYear": f"{article.date_published.year if article.date_published else ''}",
+        "relatedItemType": "Journal",
+    }
+
+    if article.issue:
+        related_item.update(
+            {
+                "issue": f"{article.issue.issue}",
+                "volume": f"{article.issue.volume}",
+            }
+        )
+
+    if article.first_page or article.last_page:
+        related_item.update(
+            {
+                "firstPage": f"{article.first_page or ''}",
+                "lastPage": f"{article.last_page or ''}",
+            }
+        )
+
+    article_data["data"]["attributes"]["relatedItems"] = [related_item]
+
+    if article.license:
+        article_data["data"]["attributes"]["rightsList"] = [
+            {
+                "rights": article.license.name,
+                "rightsUri": article.license.url,
+            }
+        ]
 
     if article.journal.issn:
         article_data["data"]["attributes"]["relatedIdentifiers"] = [
@@ -111,12 +149,14 @@ def prep_data(article, doi, event=None):
                 "relatedIdentifier": article.journal.issn,
                 "relatedIdentifierType": "ISSN",
                 "relationType": "IsPublishedIn",
-                "resourceTypeGeneral": "Journal"
+                "resourceTypeGeneral": "Journal",
             }
         ]
-        article_data["data"]["attributes"]["relatedItems"][0]["relatedItemIdentifier"] = {
+        article_data["data"]["attributes"]["relatedItems"][0][
+            "relatedItemIdentifier"
+        ] = {
             "relatedItemIdentifier": f"{article.journal.issn}",
-            "relatedItemIdentifierType": "ISSN"
+            "relatedItemIdentifierType": "ISSN",
         }
 
     if event:
@@ -125,24 +165,49 @@ def prep_data(article, doi, event=None):
     return article_data
 
 
-def mint_datacite_doi(article, doi, event=None):
+
+def mint_datacite_doi(
+    article,
+    doi,
+    event=None,
+):
     headers = {"Content-Type": "application/vnd.api+json"}
+    data = prep_data(article, doi, event)
 
     if event == 'publish' and article.get_doi():
-        # The DOI will exists and we should use a PUT command
-        url = '{}/{}'.format(plugin_settings.DATACITE_API_URL, article.get_doi())
+        url = '{}/{}'.format(
+            plugin_settings.DATACITE_API_URL,
+            article.get_doi(),
+        )
         response = requests.put(
             url=url,
-            json=prep_data(article, doi, event),
+            json=data,
             headers=headers,
-            auth=HTTPBasicAuth(plugin_settings.DATACITE_USERNAME, plugin_settings.DATACITE_PASSWORD)
+            auth=HTTPBasicAuth(
+                plugin_settings.DATACITE_USERNAME,
+                plugin_settings.DATACITE_PASSWORD,
+            ),
         )
+        # If the DOI doesn't exist for some reason (failed at accept) POST it
+        if response.status_code == 404:
+            response = requests.post(
+                url=plugin_settings.DATACITE_API_URL,
+                json=data,
+                headers=headers,
+                auth=HTTPBasicAuth(
+                    plugin_settings.DATACITE_USERNAME,
+                    plugin_settings.DATACITE_PASSWORD,
+                ),
+            )
     else:
         response = requests.post(
             url=plugin_settings.DATACITE_API_URL,
-            json=prep_data(article, doi),
+            json=data,
             headers=headers,
-            auth=HTTPBasicAuth(plugin_settings.DATACITE_USERNAME, plugin_settings.DATACITE_PASSWORD)
+            auth=HTTPBasicAuth(
+                plugin_settings.DATACITE_USERNAME,
+                plugin_settings.DATACITE_PASSWORD,
+            ),
         )
 
     if response.status_code in [200, 201]:

@@ -17,6 +17,19 @@
         <a href="{% url 'datacite_manager' %}" class="button">Manage Plugin</a>
     </div>
     <div class="content">
+      {% if not debug_mode %}
+        <p>
+          <span aria-hidden="true" class="fa fa-info-circle" ></span>
+          This installation is in debug mode, so DOIs will be deposited with the
+          DataCite test server.
+        </p>
+      {% elif test_journal %}
+        <p>
+          <span aria-hidden="true" class="fa fa-info-circle" ></span>
+          This journal has a publishing status of "test", so DOIs will be deposited
+          with the DataCite test server.
+        </p>
+      {% endif %}
         <table class="table" id="datacite_table">
             <thead>
                 <tr>

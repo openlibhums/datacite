@@ -1,3 +1,4 @@
+from django.conf import settings
 import time
 import requests
 from requests.auth import HTTPBasicAuth
@@ -5,6 +6,7 @@ from pprint import pprint
 
 from django.core.management.base import BaseCommand
 
+from journal.models import Journal
 from plugins.datacite import plugin_settings
 from identifiers import models
 
@@ -22,10 +24,21 @@ class Command(BaseCommand):
             id_type='doi',
         )
 
+        if settings.DEBUG:
+            print("Using DataCite test server because Janeway is in debug mode.")
+
         for i, doi in enumerate(dois):
             print(f"Updating {i}/{len(dois)}")
+
+            api_url = plugin_settings.DATACITE_API_URL
+            journal = doi.article.journal if doi.article else None
+            if not settings.DEBUG and journal and hasattr(journal, "status"):
+                if journal.status == Journal.PublishingStatus.TEST:
+                    api_url = plugin_settings.DATACITE_API_TEST_URL
+                    print("This journal has a publishing status of 'test',"
+                          "so DOIs will be deposited with the DataCite test server.")
             url = '{}/{}'.format(
-                plugin_settings.DATACITE_API_URL,
+                api_url,
                 doi.identifier,
             )
             headers = {"Content-Type": "application/vnd.api+json"}
@@ -53,4 +66,4 @@ class Command(BaseCommand):
                 )
                 if response.status_code == 200:
                     print('URL updated to ', response.json()['data']['attributes']['url'])
-            time.sleep(2)
+                time.sleep(2)

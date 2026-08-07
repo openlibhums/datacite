@@ -175,12 +175,13 @@ def mint_datacite_doi(
     headers = {"Content-Type": "application/vnd.api+json"}
     data = prep_data(article, doi, event)
 
+    api_url = plugin_settings.DATACITE_API_URL
+    if hasattr(article.journal, "status"):
+        if article.journal.status == Journal.PublishingStatus.TEST:
+            api_url = plugin_settings.DATACITE_API_TEST_URL
+
     if event == 'publish' and article.get_doi():
         # The DOI will exists and we should use a PUT command
-        api_url = plugin_settings.DATACITE_API_URL
-        if hasattr(article.journal, "status"):
-            if article.journal.status == Journal.PublishingStatus.TEST:
-                api_url = plugin_settings.DATACITE_API_TEST_URL
         url = '{}/{}'.format(api_url, article.get_doi())
         response = requests.put(
             url=url,
@@ -204,7 +205,7 @@ def mint_datacite_doi(
             )
     else:
         response = requests.post(
-            url=plugin_settings.DATACITE_API_URL,
+            url=api_url,
             json=data,
             headers=headers,
             auth=HTTPBasicAuth(

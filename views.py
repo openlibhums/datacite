@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.shortcuts import render, get_object_or_404, redirect, reverse
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib import messages
@@ -7,6 +8,7 @@ from submission import models as submission_models
 from identifiers import models as ident_models
 from plugins.datacite import plugin_settings, forms, utils, models
 from core import forms as core_forms
+from journal.models import Journal
 from security.decorators import has_journal
 from utils import setting_handler
 
@@ -71,6 +73,9 @@ def article_list(request):
     template = 'datacite/article_list.html'
     context = {
         'articles': articles,
+        'redeposit_button': plugin_settings.REDEPOSIT_BUTTON,
+        'debug_mode': settings.DEBUG,
+        'test_journal': request.journal.status == Journal.PublishingStatus.TEST,
     }
 
     return render(request, template, context)

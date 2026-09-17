@@ -61,6 +61,11 @@ whole installation:
 - `DATACITE_API_URL`: the DataCite API endpoint. When Django's `DEBUG`
   setting is on, the plugin uses the DataCite test API automatically, so
   development deposits never reach the production DOI registry.
+
+> [!NOTE]
+> While a site runs in debug mode, the plugin deposits to DataCite's test
+> API rather than the live one. DOIs minted against the test system do not
+> resolve and are periodically cleared by DataCite.
 - `JOURNAL_PREFIX`: when set to `True` (the default), generated DOIs include
   the journal code, as in `10.1234/orbit.123`.
 

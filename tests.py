@@ -7,9 +7,163 @@ from django.core.management import call_command
 from django.test import TestCase
 from django.utils import timezone
 
+from core import models as core_models
 from plugins.datacite import plugin_settings, utils
 from identifiers import models as im
+from submission import models as submission_models
 from utils.testing import helpers
+
+
+class PrepDataMetadataTest(TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.press = helpers.create_press()
+        cls.journal, cls.other_journal = helpers.create_journals()
+        cls.article = helpers.create_article(
+            cls.journal,
+            date_published=timezone.now(),
+            stage='Published',
+        )
+        cls.orcid_author = helpers.create_frozen_author(cls.article)
+        ror_organization = core_models.Organization.objects.create(
+            ror_id='02mb95055',
+        )
+        core_models.OrganizationName.objects.create(
+            value='University of Testing',
+            custom_label_for=ror_organization,
+        )
+        core_models.ControlledAffiliation.objects.create(
+            frozen_author=cls.orcid_author,
+            organization=ror_organization,
+        )
+        cls.plain_author = helpers.create_frozen_author(
+            cls.article,
+            frozen_orcid='',
+        )
+        helpers.create_affiliation(
+            institution='Unregistered Institute',
+            frozen_author=cls.plain_author,
+        )
+        cls.legacy_author = helpers.create_frozen_author(
+            cls.article,
+            frozen_orcid='',
+        )
+        core_models.ControlledAffiliation.objects.create(
+            frozen_author=cls.legacy_author,
+            organization=None,
+            department='Legacy Department',
+        )
+        cls.unaffiliated_author = helpers.create_frozen_author(
+            cls.article,
+            frozen_orcid='',
+        )
+        submission_models.ArticleFunding.objects.create(
+            article=cls.article,
+            name='Alpha Foundation',
+            fundref_id='https://dx.doi.org/10.13039/501100021082',
+            funding_id='ABC-123',
+        )
+        submission_models.ArticleFunding.objects.create(
+            article=cls.article,
+            name='Beta Trust',
+        )
+        cls.article_without_metadata = helpers.create_article(
+            cls.journal,
+            date_published=timezone.now(),
+            stage='Published',
+        )
+        cls.doi = '10.0000/tst.1'
+
+    def get_creators(self, article):
+        data = utils.prep_data(article, self.doi)
+        return data['data']['attributes']['creators']
+
+    def test_creator_with_orcid_includes_name_identifier(self):
+        creators = self.get_creators(self.article)
+        self.assertEqual(
+            creators[0]['nameIdentifiers'],
+            [
+                {
+                    'nameIdentifier': 'https://orcid.org/0000-0001-2345-6789',
+                    'nameIdentifierScheme': 'ORCID',
+                    'schemeUri': 'https://orcid.org',
+                }
+            ],
+        )
+
+    def test_creator_without_orcid_has_no_name_identifiers(self):
+        creators = self.get_creators(self.article)
+        self.assertNotIn('nameIdentifiers', creators[1])
+
+    def test_affiliation_with_ror_includes_identifier(self):
+        creators = self.get_creators(self.article)
+        self.assertEqual(
+            creators[0]['affiliation'],
+            [
+                {
+                    'name': 'University of Testing',
+                    'affiliationIdentifier': 'https://ror.org/02mb95055',
+                    'affiliationIdentifierScheme': 'ROR',
+                    'schemeUri': 'https://ror.org',
+                }
+            ],
+        )
+
+    def test_affiliation_without_ror_is_name_only(self):
+        creators = self.get_creators(self.article)
+        self.assertEqual(
+            creators[1]['affiliation'],
+            [
+                {
+                    'name': 'Unregistered Institute',
+                }
+            ],
+        )
+
+    def test_affiliation_without_organization_falls_back_to_string(self):
+        creators = self.get_creators(self.article)
+        self.assertEqual(
+            creators[2]['affiliation'],
+            [
+                {
+                    'name': 'Legacy Department',
+                }
+            ],
+        )
+
+    def test_creator_without_affiliations_has_empty_affiliation(self):
+        creators = self.get_creators(self.article)
+        self.assertEqual(creators[3]['affiliation'], [])
+
+    def test_article_without_authors_has_empty_creators(self):
+        creators = self.get_creators(self.article_without_metadata)
+        self.assertEqual(creators, [])
+
+    def test_funding_references(self):
+        data = utils.prep_data(self.article, self.doi)
+        self.assertEqual(
+            data['data']['attributes']['fundingReferences'],
+            [
+                {
+                    'funderName': 'Alpha Foundation',
+                    'funderIdentifier':
+                        'https://dx.doi.org/10.13039/501100021082',
+                    'funderIdentifierType': 'Crossref Funder ID',
+                    'awardNumber': 'ABC-123',
+                },
+                {
+                    'funderName': 'Beta Trust',
+                },
+            ],
+        )
+
+    def test_article_without_funders_has_empty_funding_references(self):
+        data = utils.prep_data(self.article_without_metadata, self.doi)
+        self.assertEqual(
+            data['data']['attributes']['fundingReferences'],
+            [],
+        )
 
 
 class ResetDOIsCommandTest(TestCase):

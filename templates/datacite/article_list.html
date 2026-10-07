@@ -122,7 +122,9 @@
                 {% endfor %}
             </tbody>
         </table>
-        {% include "common/elements/pagination.html" with form_id="datacite-filters" %}
+        <div class="row expanded">
+            {% include "common/elements/pagination.html" with form_id="datacite-filters" %}
+        </div>
         {% else %}
         <p>No articles match these filters.</p>
         {% endif %}

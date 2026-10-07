@@ -1,7 +1,15 @@
 {% extends "admin/core/base.html" %}
 {% load foundation %}
 
+{% block page_title %}Add Datacite DOI{% endblock page_title %}
 {% block title %}Add Datacite DOI{% endblock %}
+
+{% block breadcrumbs %}
+    {{ block.super }}
+    {% include "datacite/breadcrumb.html" %}
+    <li><a href="{% url 'datacite_articles' %}">Articles</a></li>
+    <li>Add DOI</li>
+{% endblock %}
 
 {% block body %}
     <div class="box">
@@ -9,6 +17,7 @@
             <h2>Add Datacite DOI</h2>
         </div>
         <div class="content">
+            {% include "datacite/configuration_notice.html" %}
             <div class="row expanded">
                 <div class="large-6 columns">
                     <form method="POST">
@@ -23,7 +32,12 @@
                 </div>
                 <div class="large-6 columns">
                     <p>
-                        Add a suffix to the prefix displayed to create a DOI for this article.
+                        Adding a DOI for <strong>{{ article.title|safe }}</strong>.
+                    </p>
+                    <p>
+                        The suggested DOI follows the pattern used for automatic
+                        deposits. You can change the part after
+                        <code>{{ prefix }}/</code> if needed.
                     </p>
                 </div>
             </div>

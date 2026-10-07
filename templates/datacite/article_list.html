@@ -7,7 +7,7 @@
 {% block breadcrumbs %}
     {{ block.super }}
     {% include "datacite/breadcrumb.html" %}
-    <li>Settings</li>
+    <li>Articles</li>
 {% endblock %}
 
 {% block body %}
@@ -17,17 +17,11 @@
         <a href="{% url 'datacite_manager' %}" class="button">Manage Plugin</a>
     </div>
     <div class="content">
-      {% if not debug_mode %}
+      {% include "datacite/configuration_notice.html" %}
+      {% if redeposit_button %}
         <p>
-          <span aria-hidden="true" class="fa fa-info-circle" ></span>
-          This installation is in debug mode, so DOIs will be deposited with the
-          DataCite test server.
-        </p>
-      {% elif test_journal %}
-        <p>
-          <span aria-hidden="true" class="fa fa-info-circle" ></span>
-          This journal has a publishing status of "test", so DOIs will be deposited
-          with the DataCite test server.
+          Re-depositing sends the article's current metadata to DataCite. DOIs
+          for published articles are made findable; all others stay as drafts.
         </p>
       {% endif %}
         <table class="table" id="datacite_table">
@@ -40,7 +34,7 @@
                     <th>DOI</th>
                     <th>Data</th>
                     <th>Mint</th>
-                    <th>Re-deposit</th>
+                    {% if redeposit_button %}<th>Re-deposit</th>{% endif %}
                 </tr>
             </thead>
             <tbody>
@@ -48,11 +42,12 @@
                     <tr>
                         <td>{{ article.pk }}</td>
                         <td>{{ article.title|safe }}</td>
-                        <td>{{ article.stage }}</td>
+                        <td>{{ article.get_stage_display }}</td>
                         <td>{{ article.correspondence_author.full_name }}</td>
                         <td>{{ article.datacite_doi }}</td>
                         <td><a href="{% url 'datacite_article_export' article.pk %}" target="_blank" class="small button">View Data</a></td>
                         <td>{% if not article.datacite_doi %}<a href="{% url 'datacite_add_doi' article.pk %}" class="small button">Add DOI</a>{% endif %}</td>
+                        {% if redeposit_button %}
                         <td>
                             {% if article.datacite_doi %}
                             <form method="POST">
@@ -61,6 +56,7 @@
                             </form>
                             {% endif %}
                         </td>
+                        {% endif %}
                     </tr>
                 {% endfor %}
             </tbody>

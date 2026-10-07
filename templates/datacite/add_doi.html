@@ -1,20 +1,25 @@
 {% extends "admin/core/base.html" %}
 {% load foundation %}
 
-{% block page_title %}Add Datacite DOI{% endblock page_title %}
-{% block title %}Add Datacite DOI{% endblock %}
+{% block page_title %}Add DataCite DOI{% endblock page_title %}
+{% block title %}Add DataCite DOI{% endblock %}
 
 {% block breadcrumbs %}
     {{ block.super }}
     {% include "datacite/breadcrumb.html" %}
-    <li><a href="{% url 'datacite_articles' %}">Articles</a></li>
+    <li><a href="{{ next_url }}">Articles</a></li>
     <li>Add DOI</li>
 {% endblock %}
 
+{% block css %}
+{{ block.super }}
+{% include "datacite/styles.html" %}
+{% endblock %}
+
 {% block body %}
-    <div class="box">
+    <div class="box datacite">
         <div class="title-area">
-            <h2>Add Datacite DOI</h2>
+            <h2>Add DataCite DOI</h2>
         </div>
         <div class="content">
             {% include "datacite/configuration_notice.html" %}
@@ -22,26 +27,48 @@
                 <div class="large-6 columns">
                     <form method="POST">
                         {% csrf_token %}
-                        {{ form|foundation }}
-                        <div class="row">
-                            <div class="large-12 columns">
-                                <button class="button">Save</button>
-                            </div>
+                        <input type="hidden" name="next" value="{{ next_url }}">
+                        {% if not form.findable %}
+                        <div class="callout secondary">
+                            <p>
+                                This article is not published yet, so a
+                                <strong>draft</strong> DOI will be registered.
+                                It is made findable when the article is
+                                published.
+                            </p>
                         </div>
+                        {% endif %}
+                        {{ form|foundation }}
+                        <button class="button" type="submit">{% if form.findable %}Deposit DOI{% else %}Register draft DOI{% endif %}</button>
+                        <a href="{{ next_url }}#article-{{ article.pk }}" class="button secondary hollow">Cancel</a>
                     </form>
                 </div>
                 <div class="large-6 columns">
-                    <p>
-                        Adding a DOI for <strong>{{ article.title|safe }}</strong>.
-                    </p>
+                    <div class="callout secondary">
+                        <p><strong>{{ article.title|safe }}</strong></p>
+                        <p>
+                            #{{ article.pk }}
+                            · {{ article.get_stage_display }}
+                            {% if article.section %} · {{ article.section.name }}{% endif %}
+                        </p>
+                        <p>
+                            <a href="{% url 'datacite_article_export' article.pk %}" target="_blank">
+                                View the metadata that will be sent
+                                <span class="show-for-sr">(opens in a new tab)</span>
+                            </a>
+                        </p>
+                    </div>
                     <p>
                         The suggested DOI follows the pattern used for automatic
                         deposits. You can change the part after
                         <code>{{ prefix }}/</code> if needed.
                     </p>
+                    <p>
+                        The DOI is only saved in Janeway once DataCite accepts
+                        the deposit.
+                    </p>
                 </div>
             </div>
-
         </div>
     </div>
 {% endblock body %}

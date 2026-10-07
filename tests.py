@@ -590,3 +590,158 @@ class ViewTest(TestCase):
             follow=True,
         )
         self.assertContains(response, 'Section controls saved.')
+
+    def test_filter_shows_only_articles_without_doi(self):
+        accepted = helpers.create_article(
+            self.journal,
+            title='Accepted without DOI',
+            date_accepted=timezone.now(),
+            stage='Typesetting',
+        )
+        with_doi = helpers.create_article(
+            self.journal,
+            title='Accepted with DOI',
+            date_accepted=timezone.now(),
+            stage='Typesetting',
+        )
+        im.Identifier.objects.create(
+            id_type='doi', identifier='10.1234/TST.9', article=with_doi,
+        )
+        response = self.client.get(
+            reverse('datacite_articles'), {'doi': 'missing'},
+        )
+        self.assertContains(response, 'id="article-{}"'.format(accepted.pk))
+        self.assertNotContains(response, 'id="article-{}"'.format(with_doi.pk))
+
+    @patch('plugins.datacite.utils.mint_datacite_doi')
+    def test_redeposit_returns_to_filtered_list_at_article(self, mock_mint):
+        mock_mint.return_value = (True, 'Okay')
+        article = helpers.create_article(
+            self.journal,
+            date_accepted=timezone.now(),
+            stage='Typesetting',
+        )
+        im.Identifier.objects.create(
+            id_type='doi', identifier='10.1234/TST.8', article=article,
+        )
+        next_url = reverse('datacite_articles') + '?q=test&page=2'
+        response = self.client.post(
+            reverse('datacite_articles'),
+            {'article_id': article.pk, 'next': next_url},
+        )
+        self.assertRedirects(
+            response,
+            '{}#article-{}'.format(next_url, article.pk),
+            fetch_redirect_response=False,
+        )
+        self.assertEqual(mock_mint.call_args.args[2], 'register')
+
+    @patch('plugins.datacite.utils.mint_datacite_doi')
+    def test_redeposit_ignores_external_next(self, mock_mint):
+        mock_mint.return_value = (True, 'Okay')
+        article = helpers.create_article(
+            self.journal,
+            date_accepted=timezone.now(),
+            stage='Typesetting',
+        )
+        im.Identifier.objects.create(
+            id_type='doi', identifier='10.1234/TST.7', article=article,
+        )
+        response = self.client.post(
+            reverse('datacite_articles'),
+            {'article_id': article.pk, 'next': 'https://evil.example/'},
+        )
+        self.assertRedirects(
+            response,
+            '{}#article-{}'.format(reverse('datacite_articles'), article.pk),
+            fetch_redirect_response=False,
+        )
+
+    @configured
+    @patch('plugins.datacite.utils.mint_datacite_doi')
+    def test_add_doi_returns_to_filtered_list_at_article(self, mock_mint):
+        mock_mint.return_value = (True, 'Okay')
+        next_url = reverse('datacite_articles') + '?doi=missing'
+        response = self.client.post(
+            reverse('datacite_add_doi', args=[self.article.pk]),
+            {'identifier': '10.1234/TST.6', 'next': next_url},
+        )
+        self.assertRedirects(
+            response,
+            '{}#article-{}'.format(next_url, self.article.pk),
+            fetch_redirect_response=False,
+        )
+        self.assertEqual(self.article.get_doi(), '10.1234/TST.6')
+
+    def test_index_summarises_status(self):
+        response = self.client.get(reverse('datacite_index'))
+        self.assertContains(response, 'Automatic deposit is')
+
+    def test_filter_by_stage(self):
+        typesetting = helpers.create_article(
+            self.journal,
+            date_accepted=timezone.now(),
+            stage='Typesetting',
+        )
+        proofing = helpers.create_article(
+            self.journal,
+            date_accepted=timezone.now(),
+            stage='Proofing',
+        )
+        response = self.client.get(
+            reverse('datacite_articles'), {'stage': 'Proofing'},
+        )
+        self.assertContains(response, 'id="article-{}"'.format(proofing.pk))
+        self.assertNotContains(
+            response, 'id="article-{}"'.format(typesetting.pk),
+        )
+
+    @configured
+    @patch('plugins.datacite.utils.mint_datacite_doi')
+    def test_unpublished_article_cannot_get_findable_doi(self, mock_mint):
+        mock_mint.return_value = (True, 'Okay')
+        self.client.post(
+            reverse('datacite_add_doi', args=[self.article.pk]),
+            {'identifier': '10.1234/TST.5', 'findable': 'on'},
+        )
+        self.assertEqual(mock_mint.call_args.kwargs['event'], 'register')
+
+    @configured
+    @patch('plugins.datacite.utils.mint_datacite_doi')
+    def test_published_article_can_get_findable_doi(self, mock_mint):
+        mock_mint.return_value = (True, 'Okay')
+        article = helpers.create_article(
+            self.journal,
+            stage='Published',
+            date_published=timezone.now(),
+        )
+        self.client.post(
+            reverse('datacite_add_doi', args=[article.pk]),
+            {'identifier': '10.1234/TST.4', 'findable': 'on'},
+        )
+        self.assertEqual(mock_mint.call_args.kwargs['event'], 'publish')
+
+
+class FabricaURLTest(TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.press = helpers.create_press()
+        cls.journal, _ = helpers.create_journals()
+
+    @patch.object(
+        plugin_settings, 'DATACITE_FABRICA_URL', 'https://doi.datacite.org/dois',
+    )
+    def test_live_journal_links_to_live_fabrica(self):
+        self.assertEqual(
+            utils.get_fabrica_url(self.journal, '10.85262/a11y.16'),
+            'https://doi.datacite.org/dois/10.85262%2Fa11y.16',
+        )
+
+    def test_test_journal_links_to_test_fabrica(self):
+        self.journal.status = Journal.PublishingStatus.TEST
+        self.journal.save()
+        self.assertEqual(
+            utils.get_fabrica_url(self.journal, '10.85262/a11y.16'),
+            'https://doi.test.datacite.org/dois/10.85262%2Fa11y.16',
+        )

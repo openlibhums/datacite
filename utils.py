@@ -1,3 +1,5 @@
+from urllib.parse import quote
+
 import requests
 from requests.auth import HTTPBasicAuth
 
@@ -242,6 +244,17 @@ def get_api_url(journal):
     if getattr(journal, 'status', None) == Journal.PublishingStatus.TEST:
         return plugin_settings.DATACITE_API_TEST_URL
     return plugin_settings.DATACITE_API_URL
+
+
+def get_fabrica_url(journal, doi):
+    """
+    Returns the link to a DOI in DataCite Fabrica, on the same DataCite
+    system that deposits for this journal go to.
+    """
+    base_url = plugin_settings.DATACITE_FABRICA_URL
+    if getattr(journal, 'status', None) == Journal.PublishingStatus.TEST:
+        base_url = plugin_settings.DATACITE_FABRICA_TEST_URL
+    return '{}/{}'.format(base_url, quote(doi, safe=''))
 
 
 def describe_error(response):

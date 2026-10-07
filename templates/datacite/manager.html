@@ -1,8 +1,8 @@
 {% extends "admin/core/base.html" %}
 {% load foundation %}
 
-{% block page_title %}Datacite Plugin Settings{% endblock page_title %}
-{% block title %}Datacite Plugin Settings{% endblock %}
+{% block page_title %}DataCite Settings{% endblock page_title %}
+{% block title %}DataCite Settings{% endblock %}
 
 {% block breadcrumbs %}
     {{ block.super }}
@@ -11,19 +11,30 @@
 {% endblock %}
 
 
+{% block css %}
+{{ block.super }}
+{% include "datacite/styles.html" %}
+{% endblock %}
+
 {% block body %}
-    <div class="box">
+    <div class="box datacite">
         <div class="title-area">
-          <h2>Manage Settings</h2>
+          <h2>Settings</h2>
         </div>
         <div class="content">
             <div class="row expanded">
                 <div class="large-6 columns">
-                    <p>You can manage the Datacite plugin settings from here.</p>
+                    <p>
+                        When automatic deposit is on, a draft DOI is registered
+                        when an article is accepted and made findable when it is
+                        published. You can limit this to particular sections
+                        from the <a href="{% url 'datacite_section_mint_manager' %}">section controls</a>.
+                    </p>
                     <form method="POST">
                         {% csrf_token %}
                         {{ manager_form|foundation }}
                         <button class="button success" type="submit">Save</button>
+                        <a href="{% url 'datacite_index' %}" class="button secondary hollow">Cancel</a>
                     </form>
                 </div>
             </div>

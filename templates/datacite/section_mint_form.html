@@ -1,43 +1,50 @@
 {% extends "admin/core/base.html" %}
-{% load foundation bool_fa %}
+{% load foundation %}
 
-{% block page_title %}Datacite Plugin Sections{% endblock page_title %}
-{% block title %}Datacite Plugin Sections{% endblock %}
+{% block page_title %}DataCite Section Controls{% endblock page_title %}
+{% block title %}DataCite Section Controls{% endblock %}
 
 {% block breadcrumbs %}
     {{ block.super }}
     {% include "datacite/breadcrumb.html" %}
-    <li>Section Mint Control</li>
+    <li>Section controls</li>
 {% endblock %}
 
 
+{% block css %}
+{{ block.super }}
+{% include "datacite/styles.html" %}
+{% endblock %}
+
 {% block body %}
-    <div class="box">
+    <div class="box datacite">
         <div class="title-area">
-          <h2>Manage Section Minting</h2>
+          <h2>Section controls</h2>
         </div>
         <div class="content">
             <div class="row expanded">
-                <div class="large-12 columns">
-                    <p>This page allows you to set for which sections (article types) Janeway will mint Datacite DOIs for.</p>
-                    <p>
-                      If no sections are checked, DOIs are minted for every
-                      section.
-                    </p>
-
-                    <div class="callout bs-callout bs-callout-warning">
+                <div class="large-6 columns">
+                    {% if not auto_mint_is_enabled %}
+                    <div class="callout warning">
                       <p>
-                        <span class="fa fa-exclamation-triangle"> </span>
-                        This controller will only operate if the auto deposit
-                        setting is enabled for the whole journal. Auto deposit
-                        is currently {{ auto_mint_is_enabled|bool_fa }} {% if auto_mint_is_enabled %} enabled {% else %} disabled{% endif %}.
+                        <span aria-hidden="true" class="fa fa-exclamation-triangle"></span>
+                        Automatic deposit is off for this journal, so these
+                        controls have no effect until it is
+                        <a href="{% url 'datacite_manager' %}">turned on</a>.
                       </p>
                     </div>
-
+                    {% endif %}
+                    <p>
+                        Choose the sections that DOIs are minted for
+                        automatically. If no sections are checked, DOIs are
+                        minted for every section. DOIs can still be added
+                        manually from the article list.
+                    </p>
                     <form method="POST">
                         {% csrf_token %}
                         {{ form|foundation }}
                         <button class="button success" type="submit">Save</button>
+                        <a href="{% url 'datacite_index' %}" class="button secondary hollow">Cancel</a>
                     </form>
                 </div>
             </div>

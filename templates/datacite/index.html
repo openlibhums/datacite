@@ -1,30 +1,64 @@
 {% extends "admin/core/base.html" %}
 
-{% block page_title %}Datacite Plugin{% endblock page_title %}
-{% block title %}Datacite Plugin{% endblock %}
+{% block page_title %}DataCite Plugin{% endblock page_title %}
+{% block title %}DataCite Plugin{% endblock %}
 
 {% block breadcrumbs %}
     {{ block.super }}
-    <li>Datacite Plugin</li>
+    <li>DataCite Plugin</li>
 {% endblock %}
 
 
+{% block css %}
+{{ block.super }}
+{% include "datacite/styles.html" %}
+{% endblock %}
+
 {% block body %}
-    <div class="box">
+    <div class="box datacite">
         <div class="title-area">
-          <h2>Datacite Plugin Options</h2>
+          <h2>DataCite</h2>
         </div>
         <div class="content">
             {% include "datacite/configuration_notice.html" %}
-            <div class="row expanded">
-                <div class="large-4 medium-6 small-12 columns">
-                    <div class="button-group stacked">
-                        <a class="button" href="{% url 'datacite_manager' %}">Settings</a>
-                        <a class="button" href="{% url 'datacite_articles' %}">Article List</a>
-                        <a class="button" href="{% url 'datacite_section_mint_manager' %}">Section Controls</a>
-                    </div>
-                </div>
-            </div>
+            <ul>
+                <li>
+                    Automatic deposit is
+                    <strong>{% if auto_deposit_enabled %}on{% else %}off{% endif %}</strong>
+                    for this journal{% if auto_deposit_enabled %}: DOIs are registered as drafts when articles are accepted and made findable when they are published{% endif %}.
+                </li>
+                {% if auto_deposit_enabled %}
+                <li>
+                    {% if minting_sections %}
+                        DOIs are only minted for {{ minting_sections|join:", " }}.
+                    {% else %}
+                        DOIs are minted for every section.
+                    {% endif %}
+                </li>
+                {% endif %}
+                <li>
+                    {{ missing_doi_count }} of {{ articles_count }} accepted
+                    article{{ articles_count|pluralize }} {{ missing_doi_count|pluralize:"has,have" }} no DOI.
+                    {% if missing_doi_count %}
+                    <a href="{% url 'datacite_articles' %}?doi=missing">Show articles without a DOI</a>
+                    {% endif %}
+                </li>
+            </ul>
+        </div>
+    </div>
+    <div class="box datacite">
+        <div class="title-area">
+          <h2>Options</h2>
+        </div>
+        <div class="content">
+            <dl>
+                <dt><a href="{% url 'datacite_articles' %}">Articles</a></dt>
+                <dd>Add, re-deposit and check the metadata of DOIs for accepted articles.</dd>
+                <dt><a href="{% url 'datacite_manager' %}">Settings</a></dt>
+                <dd>Turn automatic deposit on or off for this journal.</dd>
+                <dt><a href="{% url 'datacite_section_mint_manager' %}">Section controls</a></dt>
+                <dd>Choose which sections DOIs are minted for automatically.</dd>
+            </dl>
         </div>
     </div>
 {% endblock body %}

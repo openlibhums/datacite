@@ -193,3 +193,98 @@ class ResetDOIsCommandTest(TestCase):
             ],
             rows[1:],
         )
+
+
+class PrepDataCreatorsTest(TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.press = helpers.create_press()
+        cls.journal, _ = helpers.create_journals()
+        cls.article = helpers.create_article(
+            cls.journal,
+            date_published=timezone.now(),
+            stage='Published',
+        )
+        cls.author = helpers.create_frozen_author(cls.article)
+        cls.ror_affiliation = helpers.create_affiliation(
+            institution='Birkbeck, University of London',
+            department='Library',
+            frozen_author=cls.author,
+        )
+        cls.ror_affiliation.organization.ror_id = '02mb95055'
+        cls.ror_affiliation.organization.save()
+        cls.plain_affiliation = helpers.create_affiliation(
+            institution='Open Library of Humanities',
+            department='Development',
+            frozen_author=cls.author,
+        )
+
+    def get_creator(self):
+        data = utils.prep_data(self.article, '10.1234/test.1')
+        return data['data']['attributes']['creators'][0]
+
+    def test_creator_includes_orcid(self):
+        self.assertEqual(
+            self.get_creator()['nameIdentifiers'],
+            [
+                {
+                    'nameIdentifier': 'https://orcid.org/0000-0001-2345-6789',
+                    'nameIdentifierScheme': 'ORCID',
+                    'schemeUri': 'https://orcid.org',
+                }
+            ],
+        )
+
+    def test_creator_without_orcid_has_no_name_identifiers(self):
+        self.author.frozen_orcid = ''
+        self.author.save()
+        self.assertNotIn('nameIdentifiers', self.get_creator())
+
+    def test_affiliation_includes_ror(self):
+        self.assertIn(
+            {
+                'name': 'Birkbeck, University of London',
+                'affiliationIdentifier': 'https://ror.org/02mb95055',
+                'affiliationIdentifierScheme': 'ROR',
+                'schemeUri': 'https://ror.org',
+            },
+            self.get_creator()['affiliation'],
+        )
+
+    def test_affiliation_without_ror_is_name_only(self):
+        self.assertIn(
+            {'name': 'Development, Open Library of Humanities'},
+            self.get_creator()['affiliation'],
+        )
+
+    def test_author_without_affiliations_has_empty_list(self):
+        self.author.affiliations.delete()
+        self.assertEqual(self.get_creator()['affiliation'], [])
+
+
+class PrepDataUnpublishedTest(TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.press = helpers.create_press()
+        cls.journal, _ = helpers.create_journals()
+        cls.article = helpers.create_article(
+            cls.journal,
+            date_published=None,
+        )
+
+    def get_attributes(self):
+        data = utils.prep_data(self.article, '10.1234/test.1', 'register')
+        return data['data']['attributes']
+
+    def test_related_item_year_falls_back_to_current_year(self):
+        # DataCite rejects a related item whose year is not four digits,
+        # which broke registration at acceptance.
+        self.assertEqual(
+            self.get_attributes()['relatedItems'][0]['publicationYear'],
+            str(timezone.now().year),
+        )
+
+    def test_no_available_date_before_publication(self):
+        self.assertEqual(self.get_attributes()['dates'], [])

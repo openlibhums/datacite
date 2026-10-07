@@ -10,6 +10,51 @@ from utils import setting_handler
 from journal.models import Journal
 
 
+def prep_affiliation(affiliation):
+    """
+    Build a DataCite affiliation, identified by ROR where the organization
+    has a ROR ID.
+    """
+    organization = affiliation.organization
+    if organization and organization.ror_id:
+        return {
+            'name': str(organization.name),
+            'affiliationIdentifier': organization.uri,
+            'affiliationIdentifierScheme': 'ROR',
+            'schemeUri': 'https://ror.org',
+        }
+    return {
+        'name': str(affiliation),
+    }
+
+
+def prep_creator(author):
+    """
+    Build a DataCite creator, including the author's ORCID and every
+    affiliation they hold.
+    """
+    creator = {
+        'name': author.full_name(),
+        'nameType': 'Personal',
+        'givenName': author.first_name,
+        'familyName': author.last_name,
+        'affiliation': [
+            affiliation
+            for affiliation in map(prep_affiliation, author.affiliations)
+            if affiliation['name']
+        ],
+    }
+    if author.orcid_uri:
+        creator['nameIdentifiers'] = [
+            {
+                'nameIdentifier': author.orcid_uri,
+                'nameIdentifierScheme': 'ORCID',
+                'schemeUri': 'https://orcid.org',
+            }
+        ]
+    return creator
+
+
 def prep_data(
     article,
     doi,
@@ -61,17 +106,7 @@ def prep_data(
             "attributes": {
                 "doi": doi,
                 "creators": [
-                    {
-                        'name': author.full_name(),
-                        'nameType': 'Personal',
-                        'givenName': author.first_name,
-                        'familyName': author.last_name,
-                        'affiliation': [
-                            {
-                                'name': author.affiliation(),
-                            }
-                        ],
-                    }
+                    prep_creator(author)
                     for author in article.frozen_authors()
                 ],
                 "titles": [
@@ -101,11 +136,9 @@ def prep_data(
                 "dates": [
                     {
                         "dateType": "Available",
-                        "date": str(article.date_published.date())
-                        if article.date_published
-                        else '',
+                        "date": str(article.date_published.date()),
                     }
-                ],
+                ] if article.date_published else [],
             },
         }
     }
@@ -114,7 +147,7 @@ def prep_data(
         "relationType": "IsPublishedIn",
         "titles": f"{article.journal.name}",
         "publisher": f"{article.journal.publisher}",
-        "publicationYear": f"{article.date_published.year if article.date_published else ''}",
+        "publicationYear": f"{publicationYear}",
         "relatedItemType": "Journal",
     }
 

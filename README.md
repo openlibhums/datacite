@@ -20,8 +20,10 @@ made findable when it is published.
 
 The plugin builds a DataCite metadata payload from an article's metadata
 (authors, title, abstract, keywords, licence, issue, and journal ISSN) and
-sends it to the DataCite API with HTTP basic authentication. Every deposit
-passes through one of two events:
+sends it to the DataCite API with HTTP basic authentication. Authors are
+identified by their ORCID where one is recorded, and each of an author's
+affiliations is identified by its ROR ID where the organization has one.
+Every deposit passes through one of two events:
 
 - `register` creates a draft DOI that is not yet findable.
 - `publish` makes the DOI findable.

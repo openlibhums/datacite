@@ -97,7 +97,7 @@ def prep_data(
                 "subjects": keywords,
                 "formats": formats,
                 "url": article.url,
-                "schemaVersion": "http://datacite.org/schema/kernel-4.4",
+                "schemaVersion": "http://datacite.org/schema/kernel-4.7",
                 "dates": [
                     {
                         "dateType": "Available",

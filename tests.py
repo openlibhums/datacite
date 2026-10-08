@@ -193,3 +193,30 @@ class ResetDOIsCommandTest(TestCase):
             ],
             rows[1:],
         )
+
+
+class PrepDataTest(TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.press = helpers.create_press()
+        cls.journal, _ = helpers.create_journals()
+        cls.article = helpers.create_article(
+            cls.journal,
+            date_published=timezone.now(),
+            stage='Published',
+        )
+
+    def test_schema_version_is_4_7(self):
+        data = utils.prep_data(self.article, '10.0000/test.1')
+        self.assertEqual(
+            data['data']['attributes']['schemaVersion'],
+            'http://datacite.org/schema/kernel-4.7',
+        )
+
+    def test_related_item_titles_is_a_list_of_titles(self):
+        data = utils.prep_data(self.article, '10.0000/test.1')
+        self.assertEqual(
+            data['data']['attributes']['relatedItems'][0]['titles'],
+            [{'title': self.journal.name}],
+        )

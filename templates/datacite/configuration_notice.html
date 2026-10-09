@@ -1,0 +1,23 @@
+{% if not datacite_configured %}
+  <div class="callout alert">
+    <p>
+      <span aria-hidden="true" class="fa fa-exclamation-triangle"></span>
+      The DataCite username, password and prefix have not been configured for
+      this installation, so DOIs cannot be deposited. Ask your system
+      administrator to set them in the plugin settings.
+    </p>
+  </div>
+{% endif %}
+{% if debug_mode %}
+  <p>
+    <span aria-hidden="true" class="fa fa-info-circle"></span>
+    This installation is in debug mode, so DOIs will be deposited with the
+    DataCite test server.
+  </p>
+{% elif test_journal %}
+  <p>
+    <span aria-hidden="true" class="fa fa-info-circle"></span>
+    This journal has a publishing status of "test", so DOIs will be deposited
+    with the DataCite test server.
+  </p>
+{% endif %}

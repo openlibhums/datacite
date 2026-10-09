@@ -1,74 +1,134 @@
 {% extends "admin/core/base.html" %}
 {% load foundation %}
 
-{% block page_title %}Datacite Plugin Article List{% endblock %}
-{% block title %}Datacite Plugin Article List{% endblock %}
+{% block page_title %}DataCite Articles{% endblock %}
+{% block title %}DataCite Articles{% endblock %}
 
 {% block breadcrumbs %}
     {{ block.super }}
     {% include "datacite/breadcrumb.html" %}
-    <li>Settings</li>
+    <li>Articles</li>
+{% endblock %}
+
+{% block css %}
+{{ block.super }}
+{% include "datacite/styles.html" %}
 {% endblock %}
 
 {% block body %}
-<div class="box">
+<div class="box datacite">
     <div class="title-area">
-        <h2>Article List</h2>
-        <a href="{% url 'datacite_manager' %}" class="button">Manage Plugin</a>
+        <h2>Articles</h2>
     </div>
     <div class="content">
-      {% if not debug_mode %}
+        {% include "datacite/configuration_notice.html" %}
         <p>
-          <span aria-hidden="true" class="fa fa-info-circle" ></span>
-          This installation is in debug mode, so DOIs will be deposited with the
-          DataCite test server.
+            Accepted articles that have not been moved back into review.
+            Only articles in the Published stage get a findable DOI. All
+            other articles get a draft DOI, which is made findable when the
+            article is published.
         </p>
-      {% elif test_journal %}
-        <p>
-          <span aria-hidden="true" class="fa fa-info-circle" ></span>
-          This journal has a publishing status of "test", so DOIs will be deposited
-          with the DataCite test server.
-        </p>
-      {% endif %}
-        <table class="table" id="datacite_table">
+
+        <form method="GET" id="datacite-filters">
+            <div class="row expanded">
+                <div class="large-4 medium-12 columns">
+                    <label for="{{ filter_form.q.id_for_label }}">{{ filter_form.q.label }}</label>
+                    {{ filter_form.q }}
+                </div>
+                <div class="large-2 medium-4 columns">
+                    <label for="{{ filter_form.doi.id_for_label }}">{{ filter_form.doi.label }}</label>
+                    {{ filter_form.doi }}
+                </div>
+                <div class="large-3 medium-4 columns">
+                    <label for="{{ filter_form.status.id_for_label }}">{{ filter_form.status.label }}</label>
+                    {{ filter_form.status }}
+                </div>
+                <div class="large-3 medium-4 columns">
+                    <label for="{{ filter_form.stage.id_for_label }}">{{ filter_form.stage.label }}</label>
+                    {{ filter_form.stage }}
+                </div>
+            </div>
+            <div class="row expanded">
+                <div class="large-12 columns">
+                    <button type="submit" class="button">
+                        <span aria-hidden="true" class="fa fa-filter"></span>
+                        Filter
+                    </button>
+                    <a href="{{ request.path }}" class="button secondary hollow">Clear</a>
+                </div>
+            </div>
+        </form>
+
+        {% if articles %}
+        <table class="table datacite-articles">
             <thead>
                 <tr>
-                    <th>ID</th>
-                    <th>Title</th>
-                    <th>Stage</th>
-                    <th>Correspondence Author</th>
-                    <th>DOI</th>
-                    <th>Data</th>
-                    <th>Mint</th>
-                    <th>Re-deposit</th>
+                    <th scope="col">Article</th>
+                    <th scope="col">Stage</th>
+                    <th scope="col">DOI</th>
+                    <th scope="col"><span class="show-for-sr">Actions</span></th>
                 </tr>
             </thead>
             <tbody>
                 {% for article in articles %}
-                    <tr>
-                        <td>{{ article.pk }}</td>
-                        <td>{{ article.title|safe }}</td>
-                        <td>{{ article.stage }}</td>
-                        <td>{{ article.correspondence_author.full_name }}</td>
-                        <td>{{ article.datacite_doi }}</td>
-                        <td><a href="{% url 'datacite_article_export' article.pk %}" target="_blank" class="small button">View Data</a></td>
-                        <td>{% if not article.datacite_doi %}<a href="{% url 'datacite_add_doi' article.pk %}" class="small button">Add DOI</a>{% endif %}</td>
-                        <td>
-                            {% if article.datacite_doi %}
+                <tr id="article-{{ article.pk }}">
+                    <td>
+                        <strong>{{ article.title|safe }}</strong>
+                        <br>
+                        <small>
+                            #{{ article.pk }}
+                            {% if article.section %} · {{ article.section.name }}{% endif %}
+                            {% if article.correspondence_author %} · {{ article.correspondence_author.full_name }}{% endif %}
+                        </small>
+                    </td>
+                    <td>{{ article.get_stage_display }}</td>
+                    <td>
+                        {% if article.datacite_doi %}
+                            <a href="{{ article.fabrica_url }}" target="_blank" rel="noopener">
+                                <code>{{ article.datacite_doi.identifier }}</code>
+                                <span class="show-for-sr">in DataCite Fabrica (opens in a new tab)</span>
+                            </a>
+                            <br>
+                            {% if article.findable %}
+                                <span class="label success">Findable</span>
+                            {% else %}
+                                <span class="label secondary">Draft</span>
+                            {% endif %}
+                        {% else %}
+                            <span class="label warning">No DOI</span>
+                        {% endif %}
+                    </td>
+                    <td class="datacite-actions">
+                        {% if article.datacite_doi %}
+                            {% if redeposit_button %}
                             <form method="POST">
                                 {% csrf_token %}
-                                <button class="small button" name="article_id" value="{{ article.pk }}">Re-deposit</button>
+                                <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                <button class="small button" name="article_id" value="{{ article.pk }}">
+                                    {% if article.findable %}Re-deposit{% else %}Re-deposit draft{% endif %}<span class="show-for-sr"> DOI for article {{ article.pk }}</span>
+                                </button>
                             </form>
                             {% endif %}
-                        </td>
-                    </tr>
+                        {% else %}
+                            <a href="{% url 'datacite_add_doi' article.pk %}?next={{ request.get_full_path|urlencode }}" class="small button">
+                                {% if article.findable %}Add DOI{% else %}Add draft DOI{% endif %}<span class="show-for-sr"> for article {{ article.pk }}</span>
+                            </a>
+                        {% endif %}
+                        <a href="{% url 'datacite_article_export' article.pk %}" target="_blank" class="small button secondary hollow">
+                            View metadata<span class="show-for-sr"> for article {{ article.pk }} (opens in a new tab)</span>
+                        </a>
+                    </td>
+                </tr>
                 {% endfor %}
             </tbody>
         </table>
+        <div class="row expanded">
+            {% include "common/elements/pagination.html" with form_id="datacite-filters" %}
+        </div>
+        {% else %}
+        <p>No articles match these filters.</p>
+        {% endif %}
     </div>
 </div>
 {% endblock body %}
 
-{% block js %}
-    {% include "elements/datatables.html" with target="#datacite_table" order=2 %}
-{% endblock %}

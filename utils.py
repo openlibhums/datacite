@@ -1,13 +1,65 @@
+from urllib.parse import quote
+
 import requests
 from requests.auth import HTTPBasicAuth
 
 from django.utils.html import strip_tags
+from django.contrib import messages
 from django.utils import timezone
 
 from plugins.datacite import plugin_settings
 from identifiers import models as ident_models
-from utils import setting_handler
+from submission import models as submission_models
+from utils import setting_handler, models as utils_models
+from utils.logger import get_logger
 from journal.models import Journal
+
+logger = get_logger(__name__)
+
+
+def prep_affiliation(affiliation):
+    """
+    Build a DataCite affiliation, identified by ROR where the organization
+    has a ROR ID.
+    """
+    organization = affiliation.organization
+    if organization and organization.ror_id:
+        return {
+            'name': str(organization.name),
+            'affiliationIdentifier': organization.uri,
+            'affiliationIdentifierScheme': 'ROR',
+            'schemeUri': 'https://ror.org',
+        }
+    return {
+        'name': str(affiliation),
+    }
+
+
+def prep_creator(author):
+    """
+    Build a DataCite creator, including the author's ORCID and every
+    affiliation they hold.
+    """
+    creator = {
+        'name': author.full_name(),
+        'nameType': 'Personal',
+        'givenName': author.first_name,
+        'familyName': author.last_name,
+        'affiliation': [
+            affiliation
+            for affiliation in map(prep_affiliation, author.affiliations)
+            if affiliation['name']
+        ],
+    }
+    if author.orcid_uri:
+        creator['nameIdentifiers'] = [
+            {
+                'nameIdentifier': author.orcid_uri,
+                'nameIdentifierScheme': 'ORCID',
+                'schemeUri': 'https://orcid.org',
+            }
+        ]
+    return creator
 
 
 def prep_data(
@@ -61,17 +113,7 @@ def prep_data(
             "attributes": {
                 "doi": doi,
                 "creators": [
-                    {
-                        'name': author.full_name(),
-                        'nameType': 'Personal',
-                        'givenName': author.first_name,
-                        'familyName': author.last_name,
-                        'affiliation': [
-                            {
-                                'name': author.affiliation(),
-                            }
-                        ],
-                    }
+                    prep_creator(author)
                     for author in article.frozen_authors()
                 ],
                 "titles": [
@@ -101,11 +143,9 @@ def prep_data(
                 "dates": [
                     {
                         "dateType": "Available",
-                        "date": str(article.date_published.date())
-                        if article.date_published
-                        else '',
+                        "date": str(article.date_published.date()),
                     }
-                ],
+                ] if article.date_published else [],
             },
         }
     }
@@ -114,7 +154,7 @@ def prep_data(
         "relationType": "IsPublishedIn",
         "titles": f"{article.journal.name}",
         "publisher": f"{article.journal.publisher}",
-        "publicationYear": f"{article.date_published.year if article.date_published else ''}",
+        "publicationYear": f"{publicationYear}",
         "relatedItemType": "Journal",
     }
 
@@ -166,58 +206,161 @@ def prep_data(
     return article_data
 
 
+def is_configured():
+    """
+    Returns True when the DataCite credentials and prefix are set.
+    """
+    return all(
+        [
+            plugin_settings.DATACITE_USERNAME,
+            plugin_settings.DATACITE_PASSWORD,
+            plugin_settings.DATACITE_PREFIX,
+        ]
+    )
+
+
+def generate_doi(article):
+    """
+    Builds the Janeway pattern DOI for an article.
+    """
+    return "{prefix}/{journal_code}.{article_id}".format(
+        prefix=plugin_settings.DATACITE_PREFIX,
+        journal_code=article.journal.code if plugin_settings.JOURNAL_PREFIX else '',
+        article_id=article.pk,
+    )
+
+
+def deposit_event(article):
+    """
+    Returns the event to deposit for an article: published articles are made
+    findable, all others are registered as drafts.
+    """
+    if article.stage == submission_models.STAGE_PUBLISHED:
+        return 'publish'
+    return 'register'
+
+
+def get_api_url(journal):
+    if getattr(journal, 'status', None) == Journal.PublishingStatus.TEST:
+        return plugin_settings.DATACITE_API_TEST_URL
+    return plugin_settings.DATACITE_API_URL
+
+
+def get_fabrica_url(journal, doi):
+    """
+    Returns the link to a DOI in DataCite Fabrica, on the same DataCite
+    system that deposits for this journal go to.
+    """
+    base_url = plugin_settings.DATACITE_FABRICA_URL
+    if getattr(journal, 'status', None) == Journal.PublishingStatus.TEST:
+        base_url = plugin_settings.DATACITE_FABRICA_TEST_URL
+    return '{}/{}'.format(base_url, quote(doi, safe=''))
+
+
+def describe_error(response):
+    """
+    Turns a failed DataCite response into a message an editor can read.
+    """
+    try:
+        errors = response.json().get('errors', [])
+    except ValueError:
+        errors = []
+
+    descriptions = []
+    for error in errors:
+        title = error.get('title', '')
+        source = error.get('source')
+        if source:
+            title = '{}: {}'.format(source.replace('_', ' '), title)
+        descriptions.append(title)
+
+    if descriptions:
+        return '; '.join(descriptions)
+
+    text = response.content.decode('utf-8', errors='replace').strip()
+    return text or 'DataCite returned status {}.'.format(response.status_code)
+
 
 def mint_datacite_doi(
     article,
     doi,
     event=None,
 ):
-    headers = {"Content-Type": "application/vnd.api+json"}
-    data = prep_data(article, doi, event)
-
-    api_url = plugin_settings.DATACITE_API_URL
-    if hasattr(article.journal, "status"):
-        if article.journal.status == Journal.PublishingStatus.TEST:
-            api_url = plugin_settings.DATACITE_API_TEST_URL
-
-    if event == 'publish' and article.get_doi():
-        # The DOI will exists and we should use a PUT command
-        url = '{}/{}'.format(api_url, article.get_doi())
-        response = requests.put(
-            url=url,
-            json=data,
-            headers=headers,
-            auth=HTTPBasicAuth(
-                plugin_settings.DATACITE_USERNAME,
-                plugin_settings.DATACITE_PASSWORD,
-            ),
+    if not is_configured():
+        return False, (
+            'The DataCite username, password and prefix have not been '
+            'configured for this installation.'
         )
-        # If the DOI doesn't exist for some reason (failed at accept) POST it
-        if response.status_code == 404:
-            response = requests.post(
-                url=plugin_settings.DATACITE_API_URL,
+
+    headers = {"Content-Type": "application/vnd.api+json"}
+    auth = HTTPBasicAuth(
+        plugin_settings.DATACITE_USERNAME,
+        plugin_settings.DATACITE_PASSWORD,
+    )
+    data = prep_data(article, doi, event)
+    api_url = get_api_url(article.journal)
+
+    try:
+        response = None
+        if article.get_doi() == doi:
+            # The DOI should already exist at DataCite, so update it.
+            response = requests.put(
+                url='{}/{}'.format(api_url, doi),
                 json=data,
                 headers=headers,
-                auth=HTTPBasicAuth(
-                    plugin_settings.DATACITE_USERNAME,
-                    plugin_settings.DATACITE_PASSWORD,
-                ),
+                auth=auth,
             )
-    else:
-        response = requests.post(
-            url=api_url,
-            json=data,
-            headers=headers,
-            auth=HTTPBasicAuth(
-                plugin_settings.DATACITE_USERNAME,
-                plugin_settings.DATACITE_PASSWORD,
-            ),
-        )
+        # If the DOI doesn't exist for some reason (failed at accept) POST it
+        if response is None or response.status_code == 404:
+            response = requests.post(
+                url=api_url,
+                json=data,
+                headers=headers,
+                auth=auth,
+            )
+    except requests.RequestException as e:
+        return False, 'Could not reach DataCite: {}'.format(e)
 
     if response.status_code in [200, 201]:
         return True, 'Okay'
     else:
-        return False, response.content
+        return False, describe_error(response)
+
+
+def deposit_automatically(article, event, request=None):
+    """
+    Deposits the article's DOI and records the outcome so that failures are
+    not silent.
+    """
+    doi = article.get_doi() or generate_doi(article)
+    success, text = mint_datacite_doi(article, doi, event=event)
+
+    if success:
+        ident_models.Identifier.objects.get_or_create(
+            id_type='doi',
+            identifier=doi,
+            article=article,
+        )
+        description = 'DataCite DOI {} deposited ({}).'.format(doi, event)
+    else:
+        description = 'DataCite DOI {} was not deposited ({}): {}'.format(
+            doi,
+            event,
+            text,
+        )
+        logger.error(description)
+        if request:
+            messages.add_message(request, messages.ERROR, description)
+
+    utils_models.LogEntry.add_entry(
+        types='DataCite Deposit',
+        description=description,
+        level='Info' if success else 'Error',
+        actor=request.user if request else None,
+        request=request,
+        target=article,
+    )
+    return success, text
 
 
 def register_doi_automatically(**kwargs):
@@ -226,37 +369,13 @@ def register_doi_automatically(**kwargs):
     """
     article = kwargs.get('article')
     if auto_deposit_enabled(article.journal, article.section):
-        doi = "{prefix}/{journal_code}.{article_id}".format(
-            prefix=plugin_settings.DATACITE_PREFIX,
-            journal_code=article.journal.code if plugin_settings.JOURNAL_PREFIX else '',
-            article_id=article.pk
-        )
-        success, text = mint_datacite_doi(article, doi, event='register')
-
-        if success:
-            ident_models.Identifier.objects.get_or_create(
-                id_type='doi',
-                identifier=doi,
-                article=article,
-            )
+        deposit_automatically(article, 'register', kwargs.get('request'))
 
 
 def publish_doi_automatically(**kwargs):
     article = kwargs.get('article')
     if auto_deposit_enabled(article.journal, article.section):
-        doi = "{prefix}/{journal_code}.{article_id}".format(
-            prefix=plugin_settings.DATACITE_PREFIX,
-            journal_code=article.journal.code if plugin_settings.JOURNAL_PREFIX else '',
-            article_id=article.pk
-        )
-        success, text = mint_datacite_doi(article, doi, event='publish')
-
-        if success:
-            ident_models.Identifier.objects.get_or_create(
-                id_type='doi',
-                identifier=doi,
-                article=article,
-            )
+        deposit_automatically(article, 'publish', kwargs.get('request'))
 
 
 def get_settings(journal):
@@ -297,13 +416,14 @@ def auto_deposit_enabled(journal, section=None):
         if not is_enabled:
             return False
 
-        # Check if the journal has an associated SectionMint
+        # Check if the journal restricts minting to particular sections
         if section and hasattr(journal, 'sectionmint'):
-            # If a section is provided, check if minting is enabled for the
-            # section
-            return section in journal.sectionmint.sections.all()
+            sections = journal.sectionmint.sections.all()
+            # No sections selected means every section can mint
+            if sections.exists():
+                return section in sections
 
-        # If no SectionMint is found or no section is provided, return True
+        # If no restriction is found or no section is provided, return True
         return True
 
     return False

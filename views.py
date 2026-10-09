@@ -2,7 +2,10 @@ from django.conf import settings
 from django.shortcuts import render, get_object_or_404, redirect, reverse
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib import messages
+from django.core.paginator import Paginator
+from django.db.models import Prefetch
 from django.http import JsonResponse
+from django.utils.http import url_has_allowed_host_and_scheme
 
 from submission import models as submission_models
 from identifiers import models as ident_models
@@ -13,12 +16,66 @@ from security.decorators import has_journal
 from utils import setting_handler
 
 
+def configuration_context(request):
+    return {
+        'datacite_configured': utils.is_configured(),
+        'debug_mode': settings.DEBUG,
+        'test_journal': (
+            request.journal.status == Journal.PublishingStatus.TEST
+        ),
+    }
+
+
+@has_journal
 @staff_member_required
-def article_list(request):
-    # This filter is a pain but ensures that articles have at least been accepted
-    # and have not subsequently been moved back a stage.
-    articles = submission_models.Article.objects.filter(
+def index(request):
+    articles = get_doi_articles(request.journal)
+    section_mint = models.SectionMint.objects.filter(
         journal=request.journal,
+    ).first()
+    template = 'datacite/index.html'
+    context = {
+        'auto_deposit_enabled': utils.auto_deposit_enabled(request.journal),
+        'minting_sections': (
+            section_mint.sections.all() if section_mint else None
+        ),
+        'articles_count': articles.count(),
+        'missing_doi_count': articles.exclude(
+            identifier__id_type='doi',
+        ).count(),
+        **configuration_context(request),
+    }
+    return render(request, template, context)
+
+
+def safe_next_url(request, default):
+    """
+    Returns the ``next`` URL from the request when it is safe to redirect to.
+    """
+    next_url = request.POST.get('next') or request.GET.get('next')
+    if next_url and url_has_allowed_host_and_scheme(
+        next_url,
+        allowed_hosts={request.get_host()},
+        require_https=request.is_secure(),
+    ):
+        return next_url
+    return default
+
+
+def return_to_article(request, article):
+    """
+    Redirects back to the article list, keeping the editor's filters and
+    scrolling to the article they acted on.
+    """
+    url = safe_next_url(request, reverse('datacite_articles'))
+    return redirect('{}#article-{}'.format(url.split('#')[0], article.pk))
+
+
+def get_doi_articles(journal):
+    # This filter ensures that articles have at least been accepted and have
+    # not subsequently been moved back a stage.
+    return submission_models.Article.objects.filter(
+        journal=journal,
         date_declined__isnull=True,
         date_accepted__isnull=False,
     ).exclude(
@@ -32,55 +89,99 @@ def article_list(request):
         ]
     )
 
-    for article in articles:
-        article.datacite_doi = ident_models.Identifier.objects.filter(
-            article=article,
-            id_type='doi',
-        ).first()
 
-    if request.POST:
-        article_id = request.POST.get('article_id')
-        article = articles.get(pk=article_id)
-        article.datacite_doi = ident_models.Identifier.objects.filter(
-            article=article,
-            id_type='doi',
-        ).first()
+@has_journal
+@staff_member_required
+def article_list(request):
+    articles = get_doi_articles(request.journal)
 
-        if article.datacite_doi:
+    if request.method == 'POST' and plugin_settings.REDEPOSIT_BUTTON:
+        article = get_object_or_404(
+            articles,
+            pk=request.POST.get('article_id'),
+        )
+        datacite_doi = article.get_doi()
+
+        if datacite_doi:
+            event = utils.deposit_event(article)
             deposit_successful, text = utils.mint_datacite_doi(
                 article,
-                article.datacite_doi.identifier,
-                'publish',
+                datacite_doi,
+                event,
             )
             if deposit_successful:
                 messages.add_message(
                     request,
                     messages.SUCCESS,
-                    'DOI Added.',
-                )
-                return redirect(
-                    reverse(
-                        'datacite_articles',
-                    )
+                    'DOI {} re-deposited as {}.'.format(
+                        datacite_doi,
+                        'findable' if event == 'publish' else 'a draft',
+                    ),
                 )
             else:
                 messages.add_message(
                     request,
                     messages.ERROR,
-                    'DOI was not minted.<br />{}'.format(text),
+                    'DOI {} was not re-deposited. DataCite said: {}'.format(
+                        datacite_doi,
+                        text,
+                    ),
                 )
+        return return_to_article(request, article)
+
+    filter_form = forms.ArticleFilterForm(
+        request.GET or None,
+        articles=articles,
+    )
+    if filter_form.is_valid():
+        articles = filter_form.filter(articles)
+
+    articles = articles.select_related(
+        'correspondence_author',
+        'section',
+    ).prefetch_related(
+        Prefetch(
+            'identifier_set',
+            queryset=ident_models.Identifier.objects.filter(id_type='doi'),
+            to_attr='doi_identifiers',
+        )
+    ).order_by('-date_accepted', '-pk')
+
+    paginate_by = request.GET.get('paginate_by', '25')
+    if paginate_by == 'all':
+        page_obj = None
+    else:
+        if paginate_by not in ('10', '25', '50', '100'):
+            paginate_by = '25'
+        page_obj = Paginator(articles, int(paginate_by)).get_page(
+            request.GET.get('page'),
+        )
+        articles = page_obj.object_list
+
+    for article in articles:
+        article.datacite_doi = next(iter(article.doi_identifiers), None)
+        article.findable = utils.deposit_event(article) == 'publish'
+        if article.datacite_doi:
+            article.fabrica_url = utils.get_fabrica_url(
+                request.journal,
+                article.datacite_doi.identifier,
+            )
 
     template = 'datacite/article_list.html'
     context = {
         'articles': articles,
+        'filter_form': filter_form,
+        'page_obj': page_obj,
+        'is_paginated': bool(page_obj and page_obj.has_other_pages()),
+        'paginate_by': paginate_by,
         'redeposit_button': plugin_settings.REDEPOSIT_BUTTON,
-        'debug_mode': settings.DEBUG,
-        'test_journal': request.journal.status == Journal.PublishingStatus.TEST,
+        **configuration_context(request),
     }
 
     return render(request, template, context)
 
 
+@has_journal
 @staff_member_required
 def add_doi(request, article_id):
     """
@@ -89,43 +190,35 @@ def add_doi(request, article_id):
     article = get_object_or_404(
         submission_models.Article,
         pk=article_id,
+        journal=request.journal,
     )
-    datacite_doi = ident_models.Identifier.objects.filter(
-        article=article,
-        id_type='doi',
-    ).first()
-    if datacite_doi:
+    if article.get_doi():
         messages.add_message(
             request,
             messages.WARNING,
-            'Article {} already has a DOI'.format(article.pk),
+            'Article {} already has a DOI.'.format(article.pk),
         )
-        return redirect(
-            reverse(
-                'datacite_articles'
-            )
-        )
+        return return_to_article(request, article)
+
     form = forms.DOIForm(
         article=article,
         initial={
-            'identifier': "{prefix}/{journal_code}.".format(
-                prefix=plugin_settings.DATACITE_PREFIX,
-                journal_code=request.journal.code if plugin_settings.JOURNAL_PREFIX else '',
-            ),
+            'identifier': utils.generate_doi(article),
+            'findable': True,
         }
     )
-    if request.POST:
+    if request.method == 'POST':
         form = forms.DOIForm(
             request.POST,
             article=article,
         )
         if form.is_valid():
             doi = form.cleaned_data.get('identifier')
-            findable = form.cleaned_data.get('findable')
+            event = form.event
             deposit_successful, text = utils.mint_datacite_doi(
                 article,
                 doi,
-                event='publish' if findable else 'register',
+                event=event,
             )
 
             if deposit_successful:
@@ -133,24 +226,25 @@ def add_doi(request, article_id):
                 messages.add_message(
                     request,
                     messages.SUCCESS,
-                    'DOI Added.',
+                    'DOI {} deposited as {}.'.format(
+                        doi,
+                        'findable' if event == 'publish' else 'a draft',
+                    ),
                 )
-                return redirect(
-                    reverse(
-                        'datacite_articles',
-                    )
-                )
+                return return_to_article(request, article)
             else:
                 messages.add_message(
                     request,
                     messages.ERROR,
-                    'DOI was not minted.<br />{}'.format(text),
+                    'DOI was not minted. DataCite said: {}'.format(text),
                 )
     template = 'datacite/add_doi.html'
     context = {
         'article': article,
         'prefix': plugin_settings.DATACITE_PREFIX,
         'form': form,
+        'next_url': safe_next_url(request, reverse('datacite_articles')),
+        **configuration_context(request),
     }
     return render(
         request,
@@ -159,6 +253,7 @@ def add_doi(request, article_id):
     )
 
 
+@has_journal
 @staff_member_required
 def article_export(request, article_id):
     """
@@ -167,11 +262,9 @@ def article_export(request, article_id):
     article = get_object_or_404(
         submission_models.Article,
         pk=article_id,
+        journal=request.journal,
     )
-    if article.get_doi():
-        doi = article.get_doi()
-    else:
-        doi = '10.1234/example.doi',
+    doi = article.get_doi() or utils.generate_doi(article)
     article_data = utils.prep_data(article, doi, '')
     return JsonResponse(article_data)
 
@@ -238,6 +331,11 @@ def section_mint_manager(request):
         )
         if form.is_valid():
             form.save()
+            messages.add_message(
+                request,
+                messages.SUCCESS,
+                'Section controls saved.',
+            )
             return redirect('datacite_section_mint_manager')
 
     template = 'datacite/section_mint_form.html'

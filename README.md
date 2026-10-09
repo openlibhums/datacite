@@ -20,8 +20,10 @@ made findable when it is published.
 
 The plugin builds a DataCite metadata payload from an article's metadata
 (authors, title, abstract, keywords, licence, issue, and journal ISSN) and
-sends it to the DataCite API with HTTP basic authentication. Every deposit
-passes through one of two events:
+sends it to the DataCite API with HTTP basic authentication. Authors are
+identified by their ORCID where one is recorded, and each of an author's
+affiliations is identified by its ROR ID where the organization has one.
+Every deposit passes through one of two events:
 
 - `register` creates a draft DOI that is not yet findable.
 - `publish` makes the DOI findable.
@@ -83,15 +85,25 @@ select any sections, all sections can mint DOIs.
 
 The plugin's article list shows every article in the journal that has been
 accepted and not subsequently declined, archived, or moved back into review,
-alongside any DOI each article holds.
+alongside any DOI each article holds. You can search by title, article ID or
+DOI, and filter by whether an article has a DOI, whether it is published, and
+its stage. After adding or re-depositing a DOI you are returned to the same
+filtered page, at the article you changed.
+
+Only articles in the Published stage get a findable DOI. Every other article
+gets a draft DOI, which is made findable when the article is published. The
+list labels each DOI as **Draft** or **Findable**, and each DOI links to its
+record in DataCite Fabrica (the test Fabrica when deposits go to the test
+API).
 
 - If an article has no DOI, you can add one. The form is pre-filled with the
-  Janeway DOI pattern, and you can edit it before depositing. Clear the
-  **Findable** checkbox to register a draft DOI instead of a findable one.
+  Janeway DOI pattern, and you can edit the part after the prefix. For a
+  published article you can clear **Findable** to register a draft instead.
   The identifier is only saved in Janeway if the deposit succeeds.
 - If an article already has a DOI, you can re-deposit it to push updated
-  metadata to DataCite.
-- You can also export the metadata payload for any article as JSON to check
+  metadata to DataCite. Set `REDEPOSIT_BUTTON` to `False` in
+  `plugin_settings.py` to hide the button.
+- You can also view the metadata payload for any article as JSON to check
   what the plugin sends before you deposit.
 
 ## Automatic deposit
@@ -104,8 +116,13 @@ Janeway events:
   makes the DOI findable.
 
 In both cases the plugin generates the DOI from the Janeway pattern and
-records it on the article once the deposit succeeds. If section restrictions
-are configured, articles outside the selected sections are skipped.
+records it on the article once the deposit succeeds. If the article already
+has a DOI, that DOI is updated instead. If section restrictions are
+configured, articles outside the selected sections are skipped.
+
+Every automatic deposit is recorded in the article's log. If a deposit fails,
+the error is logged and shown to the editor who accepted or published the
+article.
 
 ## Management commands
 
@@ -121,17 +138,18 @@ journal that does not have one.
 python manage.py create_new_dois <journal_code> [--dry_run]
 ```
 
-### desposit_doi
+### deposit_doi
 
 Re-deposits DOIs for a single article or for every article in an issue, with
 your choice of event.
 
 ```
-python manage.py desposit_doi (--article <id> | --issue <id>) {publish|update|register}
+python manage.py deposit_doi (--article <id> | --issue <id>) {publish|update|register}
 ```
 
 Articles without a DOI are skipped, and the command reports a success and
-failure count when it finishes.
+failure count when it finishes. The old misspelled name, `desposit_doi`,
+still works.
 
 ### update_all_dois
 

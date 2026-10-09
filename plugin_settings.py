@@ -7,7 +7,7 @@ from utils.install import update_settings
 
 PLUGIN_NAME = 'Datacite Plugin'
 DISPLAY_NAME = 'Datacite'
-DESCRIPTION = 'Datacite DOI Deposit TOol.'
+DESCRIPTION = 'Datacite DOI Deposit Tool.'
 AUTHOR = 'Andy Byers'
 VERSION = '0.5'
 SHORT_NAME = 'datacite'
@@ -19,10 +19,14 @@ DATACITE_PASSWORD = ''
 DATACITE_PREFIX = ''
 DATACITE_API_URL = 'https://api.datacite.org/dois'
 DATACITE_API_TEST_URL = 'https://api.test.datacite.org/dois'
+DATACITE_FABRICA_URL = 'https://doi.datacite.org/dois'
+DATACITE_FABRICA_TEST_URL = 'https://doi.test.datacite.org/dois'
 JOURNAL_PREFIX = True
+REDEPOSIT_BUTTON = True
 
 if settings.DEBUG:
     DATACITE_API_URL = DATACITE_API_TEST_URL  # Use test in debug mode.
+    DATACITE_FABRICA_URL = DATACITE_FABRICA_TEST_URL
 
 
 class DatacitePlugin(plugins.Plugin):

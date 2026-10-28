@@ -75,7 +75,10 @@ def article_list(request):
         'articles': articles,
         'redeposit_button': plugin_settings.REDEPOSIT_BUTTON,
         'debug_mode': settings.DEBUG,
-        'test_journal': request.journal.status == Journal.PublishingStatus.TEST,
+        'test_journal': (
+            hasattr(request.journal, 'status')
+            and request.journal.status == Journal.PublishingStatus.TEST
+        ),
     }
 
     return render(request, template, context)

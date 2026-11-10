@@ -10,6 +10,69 @@ from utils import setting_handler
 from journal.models import Journal
 
 
+def affiliation_metadata(author):
+    affiliations = []
+    for affiliation in author.affiliations:
+        organization = affiliation.organization
+        if not organization or not organization.name:
+            continue
+        entry = {
+            "name": organization.name.value,
+        }
+        if organization.ror_id:
+            entry.update(
+                {
+                    "affiliationIdentifier": organization.uri,
+                    "affiliationIdentifierScheme": "ROR",
+                    "schemeUri": "https://ror.org",
+                }
+            )
+        affiliations.append(entry)
+    if not affiliations and author.affiliation():
+        # Legacy data may only have an affiliation string with no
+        # organization record behind it.
+        affiliations.append(
+            {
+                "name": str(author.affiliation()),
+            }
+        )
+    return affiliations
+
+
+def creator_metadata(author):
+    creator = {
+        "name": author.full_name(),
+        "nameType": "Personal",
+        "givenName": author.first_name,
+        "familyName": author.last_name,
+        "affiliation": affiliation_metadata(author),
+    }
+    if author.orcid_uri:
+        creator["nameIdentifiers"] = [
+            {
+                "nameIdentifier": author.orcid_uri,
+                "nameIdentifierScheme": "ORCID",
+                "schemeUri": "https://orcid.org",
+            }
+        ]
+    return creator
+
+
+def funding_metadata(article):
+    funding_references = []
+    for funder in article.funders:
+        reference = {
+            "funderName": funder.name,
+        }
+        if funder.fundref_id:
+            reference["funderIdentifier"] = funder.fundref_id
+            reference["funderIdentifierType"] = "Crossref Funder ID"
+        if funder.funding_id:
+            reference["awardNumber"] = funder.funding_id
+        funding_references.append(reference)
+    return funding_references
+
+
 def prep_data(
     article,
     doi,
@@ -61,17 +124,7 @@ def prep_data(
             "attributes": {
                 "doi": doi,
                 "creators": [
-                    {
-                        'name': author.full_name(),
-                        'nameType': 'Personal',
-                        'givenName': author.first_name,
-                        'familyName': author.last_name,
-                        'affiliation': [
-                            {
-                                'name': author.affiliation(),
-                            }
-                        ],
-                    }
+                    creator_metadata(author)
                     for author in article.frozen_authors()
                 ],
                 "titles": [
@@ -94,6 +147,7 @@ def prep_data(
                         "description": series_information,
                     },
                 ],
+                "fundingReferences": funding_metadata(article),
                 "subjects": keywords,
                 "formats": formats,
                 "url": article.url,

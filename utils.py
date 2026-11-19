@@ -97,7 +97,7 @@ def prep_data(
                 "subjects": keywords,
                 "formats": formats,
                 "url": article.url,
-                "schemaVersion": "http://datacite.org/schema/kernel-4.4",
+                "schemaVersion": "http://datacite.org/schema/kernel-4.7",
                 "dates": [
                     {
                         "dateType": "Available",
@@ -112,7 +112,7 @@ def prep_data(
 
     related_item = {
         "relationType": "IsPublishedIn",
-        "titles": f"{article.journal.name}",
+        "titles": [{"title": f"{article.journal.name}"}],
         "publisher": f"{article.journal.publisher}",
         "publicationYear": f"{article.date_published.year if article.date_published else ''}",
         "relatedItemType": "Journal",
